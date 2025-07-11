@@ -1,0 +1,26 @@
+Source Name,Default,Human,Vertebrates,Non-vertebrates,Plants,Cell lines,Supported Ontology/CV URL for values
+characteristics[organism],1,1,1,1,1,1,https://www.ebi.ac.uk/ols/ontologies/ncbitaxon
+characteristics[organism part],1,1,1,1,1,1,https://www.ebi.ac.uk/ols/ontologies/efo
+characteristics[age],0,1,0,0,0,0,
+characteristics[sex],0,1,0,0,0,0,
+characteristics[ancestry category],0,1,0,0,0,0,https://www.ebi.ac.uk/ols/ontologies/efo
+characteristics[disease],1,1,1,1,0,1,https://www.ebi.ac.uk/ols/ontologies/efo
+assay name,1,1,1,1,1,1,
+characteristics[cell type],1,1,1,1,1,1,https://www.ebi.ac.uk/ols/ontologies/efo
+characteristics[individual],0,1,0,0,0,0,
+characteristics[cell line],0,0,0,0,0,1,https://www.ebi.ac.uk/ols/ontologies/efo
+characteristics[biological replicate],1,1,1,1,1,1,
+technology type,1,1,1,1,1,1,proteomic profiling by mass spectrometry
+comment[technical replicate],1,1,1,1,1,1,
+comment[data file],1,1,1,1,1,1,
+comment[file url],1,1,1,1,1,1,
+comment[fraction identifier],1,1,1,1,1,1,
+comment[label],1,1,1,1,1,1,https://www.ebi.ac.uk/ols/ontologies/ms https://www.ebi.ac.uk/ols/ontologies/pride
+comment[cleavage agent details],1,1,1,1,1,1,https://www.ebi.ac.uk/ols/ontologies/ms
+comment[instrument],1,1,1,1,1,1,https://www.ebi.ac.uk/ols/ontologies/ms
+comment[modification parameters],1,1,1,1,1,1,https://www.ebi.ac.uk/ols/ontologies/ms
+comment[precursor mass tolerance],1,1,1,1,1,1,
+comment[fragment mass tolerance],1,1,1,1,1,1,
+comment[collision energy],0,0,0,0,0,0,
+characteristics[strain/breed],0,0,0,0,0,0,https://www.ebi.ac.uk/ols/ontologies/efo
+characteristics[ecotype/cultivar],0,0,0,0,0,0,https://www.ebi.ac.uk/ols/ontologies/efo

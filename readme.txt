@@ -1,0 +1,132 @@
+# SDRF-Proteomics Data Generation Standard
+
+## Overview
+Generate tab-delimited proteomics metadata files following the Sample and Data Relationship Format for Proteomics (SDRF-Proteomics) specification. Each row represents a relationship between a sample and a data file, with columns representing properties/attributes.
+
+## File Format Rules
+
+### Basic Structure
+- **Format**: Tab-delimited (.tsv or .txt)
+- **Case sensitivity**: Case-insensitive specification, but RECOMMEND lowercase
+- **Spaces**: Case-sensitive to spaces (avoid spaces in names)
+- **Missing values**: Use "not available" for unknown values, "not applicable" for non-applicable values
+
+### Column Order (MANDATORY)
+1. Source name and sample characteristics
+2. Assay name
+3. Technology type (RECOMMENDED after assay name)
+4. All comment columns (data file properties)
+
+## Required Columns
+
+### Sample Metadata (MANDATORY)
+| Column | Description | Example Values | Notes |
+|--------|-------------|----------------|--------|
+| `source name` | Unique sample identifier | sample_001, patient_A_liver | Can appear multiple times |
+| `characteristics[organism]` | Source organism | homo sapiens, mus musculus | Use NCBI taxonomy |
+| `characteristics[disease]` | Disease under study | liver cancer, normal, diabetes | Use MONDO ontology |
+| `characteristics[organism part]` | Anatomical part/tissue | liver, brain, blood | Use anatomy ontologies |
+| `characteristics[cell type]` | Cell type if applicable | epithelial, glial, not available | Use cell ontology |
+
+### Data File Metadata (MANDATORY)
+| Column | Description | Example Values | Notes |
+|--------|-------------|----------------|--------|
+| `assay name` | MS run identifier | run_1, fraction_1_rep_2 | Must precede comments |
+| `technology type` | Experimental technology | proteomic profiling by mass spectrometry | Fixed value for proteomics |
+| `comment[fraction identifier]` | Fraction number | 1, 2, 3 | Start from 1, use 1 if not fractionated |
+| `comment[label]` | Labeling method | label free sample, TMT126, SILAC light | See label values below |
+| `comment[instrument]` | Mass spectrometer model | LTQ Orbitrap XL, Q Exactive HF | Use PSI-MS ontology |
+| `comment[data file]` | Raw/processed file name | file001.RAW, data.mzML | Actual file names |
+
+### Replication Tracking (MANDATORY)
+| Column | Description | Example Values | Notes |
+|--------|-------------|----------------|--------|
+| `comment[technical replicate]` | Technical replicate number | 1, 2, 3 | Use 1 if no tech replicates |
+| `characteristics[biological replicate]` | Biological replicate number | 1, 2, 3 | Use 1 if no bio replicates |
+
+## Common Label Values
+- **Label-free**: `label free sample`
+- **TMT**: `TMT126`, `TMT127`, `TMT127C`, `TMT127N`, `TMT128`, `TMT128C`, `TMT128N`, `TMT129`, `TMT129C`, `TMT129N`, `TMT130`, `TMT130C`, `TMT130N`, `TMT131`
+- **SILAC**: `SILAC light`, `SILAC medium`, `SILAC heavy`
+- **iTRAQ**: `iTRAQ114`, `iTRAQ115`, `iTRAQ116`, `iTRAQ117`
+
+## Optional But Recommended Columns
+
+### Sample Preparation
+| Column | Description | Example Values |
+|--------|-------------|----------------|
+| `comment[cleavage agent details]` | Digestion enzyme | NT=Trypsin;AC=MS:1001251 |
+| `comment[modification parameters]` | PTMs and modifications | NT=Oxidation;MT=Variable;TA=M |
+| `comment[reduction reagent]` | Disulfide reduction | DTT, TCEP |
+| `comment[alkylation reagent]` | Cysteine alkylation | IAA, chloroacetamide |
+
+### MS Parameters
+| Column | Description | Example Values |
+|--------|-------------|----------------|
+| `comment[fragment mass tolerance]` | MS2 tolerance | 0.6 Da, 20 ppm |
+| `comment[precursor mass tolerance]` | MS1 tolerance | 10 ppm, 0.5 Da |
+| `comment[dissociation method]` | Fragmentation | HCD, CID, ETD |
+| `comment[proteomics data acquisition method]` | Acquisition mode | data-dependent acquisition, data-independent acquisition |
+
+### Additional Metadata
+| Column | Description | Example Values |
+|--------|-------------|----------------|
+| `characteristics[age]` | Subject age | 45Y, 30Y6M, 25Y-35Y |
+| `characteristics[sex]` | Biological sex | male, female, not available |
+| `factor value[condition]` | Experimental variable | treated, control, high_dose |
+
+## Special Use Cases
+
+### Multiplexed Experiments (TMT/iTRAQ)
+- Each channel gets separate row
+- Same data file, different labels
+- All samples must have same fraction identifier
+
+### Fractionated Samples
+- Multiple rows per sample (one per fraction)
+- Increment fraction identifier: 1, 2, 3, etc.
+- Same sample name, different assay names
+
+### Phosphoproteomics
+- Add: `characteristics[enrichment process]` = "enrichment of phosphorylated protein"
+- Include phospho-specific modifications in modification parameters
+
+### Age Encoding
+- Format: `{X}Y{X}M{X}D` (Years, Months, Days)
+- Examples: `40Y`, `40Y5M`, `40Y5M2D`, `8W`
+- Ranges: `40Y-85Y`
+
+## Modification Parameters Format
+Use key=value pairs separated by semicolons:
+- `NT` = Name (MANDATORY)
+- `AC` = Accession (optional)
+- `MT` = Type: Fixed/Variable/Annotated (optional)
+- `TA` = Target amino acid (MANDATORY)
+- `PP` = Position (optional)
+
+Example: `NT=Oxidation;MT=Variable;TA=M;AC=UNIMOD:35`
+
+## Validation Rules
+1. Each row must have all MANDATORY columns
+2. assay name must appear before comment columns
+3. Fraction identifier must be numeric, starting from 1
+4. File names in comment[data file] should be unique per row
+5. Same source name can appear multiple times
+6. Technical/biological replicate numbers must be consistent
+
+## Example Row Structure
+```
+source name	characteristics[organism]	characteristics[disease]	characteristics[organism part]	characteristics[cell type]	characteristics[biological replicate]	assay name	technology type	comment[technical replicate]	comment[fraction identifier]	comment[label]	comment[instrument]	comment[data file]
+sample_001	homo sapiens	liver cancer	liver	not available	1	run_1	proteomic profiling by mass spectrometry	1	1	label free sample	Q Exactive HF	sample_001_run1.RAW
+```
+
+## Output Requirements
+When generating SDRF-Proteomics files:
+1. Always include header row with column names
+2. Use tab separation between columns
+3. Ensure all MANDATORY columns are present
+4. Use controlled vocabulary terms where specified
+5. Follow naming conventions and formatting rules
+6. Include realistic but diverse sample metadata
+7. Maintain internal consistency (same sample = same characteristics)
+8. Generate appropriate number of rows for experimental design

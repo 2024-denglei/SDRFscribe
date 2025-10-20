@@ -1,7 +1,7 @@
 """
-LangChain 网页聊天助手 - 优化后端服务
-支持会话管理、SDRF JSON压缩格式解析、自动续写
-优化大数据集处理，支持多种压缩格式
+LangChain Web Chat Assistant - Optimized Backend Service
+Supports session management, SDRF JSON compression format parsing, auto-continuation
+Optimized for large dataset processing, supports multiple compression formats
 """
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
@@ -28,7 +28,7 @@ load_dotenv()
 
 app = FastAPI(title="SDRF-GPT API")
 
-# 允许跨域
+# Allow CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -37,18 +37,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 挂载静态文件服务
+# Mount static file service
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 class SDRFJsonParser:
-    """SDRF JSON数据解析器 - 支持多种压缩格式和截断检测"""
+    """SDRF JSON Data Parser - Supports multiple compression formats and truncation detection"""
 
     def __init__(self):
         self.json_parser = JsonOutputParser()
 
     def is_sdrf_json(self, text: str) -> bool:
-        """判断文本是否包含SDRF格式的JSON数据"""
+        """Determine if text contains SDRF format JSON data"""
         try:
             json_match = re.search(r'```json\s*(.*?)\s*```', text, re.DOTALL)
             if json_match:
@@ -58,14 +58,14 @@ class SDRFJsonParser:
 
             data = json.loads(json_str)
 
-            # 检查各种可能的格式
+            # Check various possible formats
             if isinstance(data, dict):
-                # 压缩格式
+                # Compressed format
                 if self._is_compressed_format(data):
                     return True
-                # 标准对象格式
+                # Standard object format
                 return self._is_sdrf_object_format(data)
-            # 标准数组格式
+            # Standard array format
             elif isinstance(data, list) and len(data) > 0:
                 return self._is_sdrf_array_format(data)
 
@@ -75,14 +75,14 @@ class SDRFJsonParser:
             return False
 
     def _is_compressed_format(self, data: dict) -> bool:
-        """检查是否是压缩格式"""
-        # 模板压缩格式
+        """Check if it's compressed format"""
+        # Template compression format
         if "format_type" in data and data["format_type"] == "compressed_template":
             return "template" in data and "variable_data" in data
-        # 矩阵压缩格式
+        # Matrix compression format
         if "format_type" in data and data["format_type"] == "compressed_matrix":
             return "field_names" in data and "data_matrix" in data
-        # 兼容没有format_type标记的旧压缩格式
+        # Compatible with old compression formats without format_type marker
         if "template" in data and "variable_data" in data:
             return True
         if "field_names" in data and "data_matrix" in data:
@@ -90,7 +90,7 @@ class SDRFJsonParser:
         return False
 
     def _is_sdrf_object_format(self, data: dict) -> bool:
-        """检查是否是SDRF标准对象格式 {"field": [...], ...}"""
+        """Check if it's SDRF standard object format {"field": [...], ...}"""
         if not isinstance(data, dict) or len(data) == 0:
             return False
 
@@ -111,7 +111,7 @@ class SDRFJsonParser:
         if not has_sdrf_field:
             return False
 
-        # 检查每个字段的值是否都是数组
+        # Check if all field values are arrays
         for key, value in data.items():
             if not isinstance(value, list):
                 return False
@@ -119,7 +119,7 @@ class SDRFJsonParser:
         return True
 
     def _is_sdrf_array_format(self, data: list) -> bool:
-        """检查是否是SDRF数组格式 [{...}, {...}, ...]"""
+        """Check if it's SDRF array format [{...}, {...}, ...]"""
         first_item = data[0]
         if not isinstance(first_item, dict):
             return False
@@ -136,7 +136,7 @@ class SDRFJsonParser:
         return has_sdrf_field
 
     def is_json_truncated(self, text: str) -> bool:
-        """检测JSON数据是否被截断"""
+        """Detect if JSON data is truncated"""
         text = text.strip()
 
         has_json_start = bool(re.search(r'^```json', text, re.IGNORECASE))
@@ -147,24 +147,24 @@ class SDRFJsonParser:
         if not has_json_end:
             return True
 
-        # 检查JSON结构完整性
+        # Check JSON structure integrity
         try:
             json_content = self.extract_partial_json(text)
             json.loads(json_content)
             return False
         except json.JSONDecodeError:
-            print(f"⚠️ JSON结构不完整，可能需要继续")
+            print(f"⚠️ JSON structure incomplete, may need to continue")
             return True
 
     def extract_partial_json(self, text: str) -> str:
-        """提取部分JSON内容"""
+        """Extract partial JSON content"""
         json_match = re.search(r'```json\s*(.*?)(?:```)?$', text, re.DOTALL)
         if json_match:
             return json_match.group(1).strip()
         return text.strip()
 
     def extract_json_data(self, text: str) -> List[Dict[str, Any]]:
-        """从文本中提取JSON数据并展开为标准数组格式"""
+        """Extract JSON data from text and expand to standard array format"""
         try:
             json_match = re.search(r'```json\s*(.*?)\s*```', text, re.DOTALL)
             if json_match:
@@ -174,7 +174,7 @@ class SDRFJsonParser:
 
             data = json.loads(json_str)
 
-            # 根据格式类型进行处理
+            # Process according to format type
             if isinstance(data, dict):
                 if self._is_compressed_format(data):
                     return self._expand_compressed_data(data)
@@ -186,54 +186,54 @@ class SDRFJsonParser:
                 return []
 
         except json.JSONDecodeError as e:
-            print(f"JSON解析错误: {e}")
+            print(f"JSON parsing error: {e}")
             return []
         except Exception as e:
-            print(f"数据提取错误: {e}")
+            print(f"Data extraction error: {e}")
             return []
 
     def _expand_compressed_data(self, data: dict) -> List[Dict[str, Any]]:
-        """展开压缩格式的数据"""
+        """Expand compressed format data"""
         format_type = data.get("format_type", "")
 
-        # 模板压缩格式
+        # Template compression format
         if format_type == "compressed_template" or "template" in data:
             return self._expand_template_format(data)
 
-        # 矩阵压缩格式
+        # Matrix compression format
         elif format_type == "compressed_matrix" or "field_names" in data:
             return self._expand_matrix_format(data)
 
         return []
 
     def _expand_template_format(self, data: dict) -> List[Dict[str, Any]]:
-        """展开模板压缩格式
+        """Expand template compression format
 
-        输入格式:
+        Input format:
         {
             "template": {"field1": "value1", ...},
             "variable_data": [{"field2": "value2", ...}, ...]
         }
 
-        输出: 每行都是完整的SDRF记录
+        Output: Each row is a complete SDRF record
         """
         template = data.get("template", {})
         variable_data = data.get("variable_data", [])
 
         result = []
         for var_row in variable_data:
-            # 合并模板和变量数据
+            # Merge template and variable data
             row = template.copy()
             row.update(var_row)
             result.append(row)
 
-        print(f"✅ 成功展开模板格式: {len(result)} 行数据")
+        print(f"✅ Successfully expanded template format: {len(result)} rows of data")
         return result
 
     def _expand_matrix_format(self, data: dict) -> List[Dict[str, Any]]:
-        """展开矩阵压缩格式
+        """Expand matrix compression format
 
-        输入格式:
+        Input format:
         {
             "constant_fields": {"field1": "value1", ...},
             "field_names": ["field2", "field3", ...],
@@ -246,23 +246,23 @@ class SDRFJsonParser:
 
         result = []
         for matrix_row in data_matrix:
-            # 先复制常量字段
+            # First copy constant fields
             row = constant_fields.copy()
-            # 添加变量字段
+            # Add variable fields
             for i, field_name in enumerate(field_names):
                 if i < len(matrix_row):
                     row[field_name] = matrix_row[i]
             result.append(row)
 
-        print(f"✅ 成功展开矩阵格式: {len(result)} 行数据")
+        print(f"✅ Successfully expanded matrix format: {len(result)} rows of data")
         return result
 
     def _convert_object_to_array(self, obj_data: dict) -> List[Dict[str, Any]]:
-        """将对象格式转换为数组格式"""
+        """Convert object format to array format"""
         if not obj_data:
             return []
 
-        # 获取第一个字段确定行数
+        # Get first field to determine row count
         first_key = next(iter(obj_data.keys()))
         row_count = len(obj_data[first_key])
 
@@ -279,7 +279,7 @@ class SDRFJsonParser:
         return result
 
     def combine_json_parts(self, parts: List[str]) -> str:
-        """合并多个JSON片段"""
+        """Combine multiple JSON fragments"""
         if not parts:
             return ""
 
@@ -305,7 +305,7 @@ class Chatbot:
             temperature=0.7,
         )
 
-        # 读取系统提示词文件
+        # Read system prompt file
         with open('system_prompt.txt', 'r', encoding='utf-8') as f:
             self.system_prompt = f.read().strip()
 
@@ -336,12 +336,12 @@ class Chatbot:
         return self.store[session_id]
 
     async def _continue_generation(self, session_id: str) -> str:
-        """发送'继续'请求获取剩余内容"""
+        """Send 'continue' request to get remaining content"""
         config = {'configurable': {'session_id': session_id}}
 
         response = await self.chatbot.ainvoke(
             {
-                'input': '请继续输出剩余的JSON数据，保持相同的格式',
+                'input': 'Please continue outputting the remaining JSON data, maintaining the same format',
                 'sdrf_proteomic': self.sdrf_proteomic,
                 'system_prompt': self.system_prompt
             },
@@ -351,7 +351,7 @@ class Chatbot:
         return response.content if hasattr(response, 'content') else str(response)
 
     async def stream_chat(self, user_input: str, session_id: str):
-        """流式输出聊天响应，支持SDRF JSON数据检测和自动续写"""
+        """Stream chat response, supports SDRF JSON data detection and auto-continuation"""
         config = {'configurable': {'session_id': session_id}}
 
         full_response = ""
@@ -359,7 +359,7 @@ class Chatbot:
         max_continue_attempts = 5
         continue_count = 0
 
-        # 第一次生成
+        # First generation
         try:
             async for chunk in self.chatbot.astream(
                     {
@@ -373,12 +373,12 @@ class Chatbot:
                     full_response += chunk.content
                     yield f"data: {json.dumps({'content': chunk.content, 'type': 'text'})}\n\n"
         except Exception as e:
-            error_msg = f"生成错误: {str(e)}"
+            error_msg = f"Generation error: {str(e)}"
             yield f"data: {json.dumps({'content': error_msg, 'type': 'error'})}\n\n"
             yield "data: [DONE]\n\n"
             return
 
-        # 检查是否需要续写
+        # Check if continuation is needed
         while (continue_count < max_continue_attempts and
                self.sdrf_parser.is_json_truncated(full_response)):
 
@@ -386,7 +386,7 @@ class Chatbot:
             if json_part:
                 json_parts.append(json_part)
 
-            yield f"data: {json.dumps({'content': '\\n\\n[🔄 检测到输出被截断，正在获取剩余内容...]\\n\\n', 'type': 'text'})}\n\n"
+            yield f"data: {json.dumps({'content': '\\n\\n[🔄 Truncation detected, retrieving remaining content...]\\n\\n', 'type': 'text'})}\n\n"
 
             continue_count += 1
 
@@ -397,10 +397,10 @@ class Chatbot:
                 await asyncio.sleep(0.5)
 
             except Exception as e:
-                print(f"续写生成时出错: {e}")
+                print(f"Error during continuation generation: {e}")
                 break
 
-        # 处理JSON数据
+        # Process JSON data
         if json_parts or self.sdrf_parser.is_sdrf_json(full_response):
             try:
                 if json_parts:
@@ -413,25 +413,25 @@ class Chatbot:
                     json_data = self.sdrf_parser.extract_json_data(full_response)
 
                 if json_data:
-                    # 发送JSON数据
+                    # Send JSON data
                     yield f"data: {json.dumps({'type': 'sdrf_json', 'data': json_data})}\n\n"
 
-                    # 统计信息
+                    # Statistics
                     if continue_count > 0:
-                        success_msg = f"\\n✅ 成功合并 {continue_count + 1} 个片段"
+                        success_msg = f"\\n✅ Successfully merged {continue_count + 1} fragments"
                         yield f"data: {json.dumps({'content': success_msg, 'type': 'text'})}\n\n"
 
-                    stats_msg = f"\\n📊 共生成 {len(json_data)} 行SDRF数据"
+                    stats_msg = f"\\n📊 Generated {len(json_data)} rows of SDRF data"
                     yield f"data: {json.dumps({'content': stats_msg, 'type': 'text'})}\n\n"
 
             except Exception as e:
-                error_msg = f"\\n❌ JSON数据处理失败: {str(e)}"
+                error_msg = f"\\n❌ JSON data processing failed: {str(e)}"
                 yield f"data: {json.dumps({'content': error_msg, 'type': 'text'})}\n\n"
 
         yield "data: [DONE]\n\n"
 
     def get_sessions(self):
-        """获取所有会话"""
+        """Get all sessions"""
         return [
             {
                 'id': sid,
@@ -441,20 +441,20 @@ class Chatbot:
         ]
 
     def _get_session_title(self, session_id: str):
-        """获取会话标题"""
+        """Get session title"""
         if session_id in self.session_names:
             return self.session_names[session_id]
         return session_id
 
     def rename_session(self, session_id: str, new_name: str):
-        """重命名会话"""
+        """Rename session"""
         if session_id in self.store:
             self.session_names[session_id] = new_name
             return True
         return False
 
     def get_session_history(self, session_id: str):
-        """获取指定会话的历史记录"""
+        """Get history of specified session"""
         if session_id in self.store:
             messages = self.store[session_id].messages
             return [
@@ -467,16 +467,16 @@ class Chatbot:
         return []
 
     def clear_session(self, session_id: str):
-        """清空会话"""
+        """Clear session"""
         if session_id in self.store:
             self.store[session_id].clear()
 
 
-# 全局机器人实例
+# Global bot instance
 bot = Chatbot()
 
 
-# API 模型
+# API Models
 class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
@@ -491,28 +491,28 @@ class RenameRequest(BaseModel):
     new_name: str
 
 
-# 页面路由
+# Page Routes
 @app.get("/")
 async def root():
-    """主页"""
+    """Home page"""
     return FileResponse("static/home.html")
 
 
 @app.get("/home")
 async def home():
-    """介绍页面"""
+    """Introduction page"""
     return FileResponse("static/home.html")
 
 
 @app.get("/chat")
 async def chat():
-    """聊天页面"""
+    """Chat page"""
     return FileResponse("static/chat.html")
 
 
-# 文件处理函数
+# File processing function
 def process_file(file_content: bytes, filename: str) -> str:
-    """处理上传的文件并返回文本内容"""
+    """Process uploaded file and return text content"""
     file_ext = filename.lower().split('.')[-1]
 
     if file_ext == 'pdf':
@@ -520,39 +520,39 @@ def process_file(file_content: bytes, filename: str) -> str:
         text = ""
         for page in pdf_reader.pages:
             text += page.extract_text() + "\n"
-        return f"📄 PDF文件内容 ({filename}):\n{text}"
+        return f"📄 PDF File Content ({filename}):\n{text}"
 
     elif file_ext == 'csv':
         df = pd.read_csv(BytesIO(file_content))
-        info = f"📊 CSV文件信息 ({filename}):\n"
-        info += f"行数: {len(df)}\n"
-        info += f"列数: {len(df.columns)}\n"
-        info += f"列名: {', '.join(df.columns)}\n\n"
-        info += f"完整数据:\n{df.to_string()}\n\n"
-        info += f"数据统计:\n{df.describe().to_string()}"
+        info = f"📊 CSV File Information ({filename}):\n"
+        info += f"Rows: {len(df)}\n"
+        info += f"Columns: {len(df.columns)}\n"
+        info += f"Column Names: {', '.join(df.columns)}\n\n"
+        info += f"Complete Data:\n{df.to_string()}\n\n"
+        info += f"Data Statistics:\n{df.describe().to_string()}"
         return info
 
     elif file_ext in ['txt', 'tsv']:
         text = file_content.decode('utf-8', errors='ignore')
-        return f"📝 文本文件内容 ({filename}):\n{text}"
+        return f"📝 Text File Content ({filename}):\n{text}"
 
     elif file_ext in ['xlsx', 'xls']:
         df = pd.read_excel(BytesIO(file_content))
-        info = f"📊 Excel文件信息 ({filename}):\n"
-        info += f"行数: {len(df)}\n"
-        info += f"列数: {len(df.columns)}\n"
-        info += f"列名: {', '.join(df.columns)}\n\n"
-        info += f"完整数据:\n{df.to_string()}"
+        info = f"📊 Excel File Information ({filename}):\n"
+        info += f"Rows: {len(df)}\n"
+        info += f"Columns: {len(df.columns)}\n"
+        info += f"Column Names: {', '.join(df.columns)}\n\n"
+        info += f"Complete Data:\n{df.to_string()}"
         return info
 
     else:
-        return f"⚠️ 不支持的文件格式: {file_ext}"
+        return f"⚠️ Unsupported file format: {file_ext}"
 
 
-# API 端点
+# API Endpoints
 @app.post("/upload")
 async def upload_file(files: List[UploadFile] = File(...)):
-    """上传并处理多个文件"""
+    """Upload and process multiple files"""
     try:
         all_content = []
         filenames = []
@@ -571,14 +571,14 @@ async def upload_file(files: List[UploadFile] = File(...)):
             "file_count": len(files)
         }
     except Exception as e:
-        raise HTTPException(500, f"文件处理失败: {str(e)}")
+        raise HTTPException(500, f"File processing failed: {str(e)}")
 
 
 @app.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
-    """流式聊天"""
+    """Streaming chat"""
     if not request.message.strip():
-        raise HTTPException(400, "消息不能为空")
+        raise HTTPException(400, "Message cannot be empty")
 
     return StreamingResponse(
         bot.stream_chat(request.message, request.session_id),
@@ -588,52 +588,52 @@ async def chat_stream(request: ChatRequest):
 
 @app.get("/sessions")
 async def get_sessions():
-    """获取所有会话"""
+    """Get all sessions"""
     return {"sessions": bot.get_sessions()}
 
 
 @app.post("/sessions/rename")
 async def rename_session(request: RenameRequest):
-    """重命名会话"""
+    """Rename session"""
     if not request.new_name.strip():
-        raise HTTPException(400, "名称不能为空")
+        raise HTTPException(400, "Name cannot be empty")
 
     success = bot.rename_session(request.session_id, request.new_name.strip())
     if success:
-        return {"status": "success", "message": "会话重命名成功"}
+        return {"status": "success", "message": "Session renamed successfully"}
     else:
-        raise HTTPException(404, "会话不存在")
+        raise HTTPException(404, "Session does not exist")
 
 
 @app.get("/sessions/{session_id}/history")
 async def get_session_history(session_id: str):
-    """获取会话历史记录"""
+    """Get session history"""
     history = bot.get_session_history(session_id)
     return {"history": history, "session_id": session_id}
 
 
 @app.post("/sessions/clear")
 async def clear_session(request: SessionRequest):
-    """清空会话"""
+    """Clear session"""
     bot.clear_session(request.session_id)
-    return {"status": "success", "message": "会话已清空"}
+    return {"status": "success", "message": "Session cleared"}
 
 
 @app.delete("/sessions/{session_id}")
 async def delete_session(session_id: str):
-    """删除会话"""
+    """Delete session"""
     if session_id in bot.store:
         del bot.store[session_id]
         if session_id in bot.session_names:
             del bot.session_names[session_id]
-        return {"status": "success", "message": "会话已删除"}
+        return {"status": "success", "message": "Session deleted"}
     else:
-        raise HTTPException(404, "会话不存在")
+        raise HTTPException(404, "Session does not exist")
 
 
 @app.get("/health")
 async def health_check():
-    """健康检查"""
+    """Health check"""
     return {
         "status": "healthy",
         "sessions_count": len(bot.store),
@@ -643,8 +643,8 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 启动 SDRF-GPT 服务...")
-    print("📝 系统提示词已加载")
-    print("🔧 支持压缩格式JSON解析")
-    print("✅ 服务就绪: http://127.0.0.1:8000")
+    print("🚀 Starting SDRF-GPT service...")
+    print("📝 System prompt loaded")
+    print("🔧 Compressed format JSON parsing supported")
+    print("✅ Service ready: http://127.0.0.1:8000")
     uvicorn.run(app, host="127.0.0.1", port=8000)

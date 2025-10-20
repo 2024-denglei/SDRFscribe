@@ -147,7 +147,19 @@ class SDRFJsonParser:
         has_json_end = bool(re.search(r'```\s*$', text))
 
         # 如果以```json开头但没有以```结尾，就是被截断了
-        return not has_json_end
+        # 额外检查：如果JSON对象或数组没有正确闭合
+        if not has_json_end:
+            return True
+
+        # 即使有结尾标记，也检查JSON是否完整
+        try:
+            json_content = self.extract_partial_json(text)
+            json.loads(json_content)
+            return False  # JSON完整
+        except json.JSONDecodeError:
+            # JSON不完整，可能被截断
+            print(f"⚠️ JSON结构不完整，可能需要继续")
+            return True
 
     def extract_partial_json(self, text: str) -> str:
         """提取部分JSON内容，用于拼接"""
@@ -271,7 +283,11 @@ class Chatbot:
 
         # 使用同步方式获取继续的内容
         response = await self.chatbot.ainvoke(
-            {'input': '请继续输出剩余的JSON数据'},
+            {
+                    'input': '请继续输出剩余的JSON数据',
+                    'sdrf_proteomic': self.sdrf_proteomic,
+                    'system_prompt': self.system_prompt
+        },
             config=config
         )
 

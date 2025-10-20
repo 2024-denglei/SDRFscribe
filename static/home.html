@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDRF-GPT - 智能对话助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #1a1a1a;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            flex: 1;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .header h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 16px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.25rem;
+            color: rgba(255,255,255,0.9);
+            font-weight: 300;
+        }
+
+        .content {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section:last-child {
+            margin-bottom: 0;
+        }
+
+        .section h2 {
+            font-size: 1.75rem;
+            color: #6b46c1;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section p {
+            font-size: 1.1rem;
+            line-height: 1.7;
+            color: #4a4a4a;
+            margin-bottom: 16px;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin: 30px 0;
+        }
+
+        .feature {
+            background: #f8f9ff;
+            padding: 24px;
+            border-radius: 12px;
+            border-left: 4px solid #6b46c1;
+        }
+
+        .feature h3 {
+            font-size: 1.25rem;
+            color: #6b46c1;
+            margin-bottom: 12px;
+        }
+
+        .feature p {
+            font-size: 1rem;
+            color: #666;
+            margin: 0;
+        }
+
+        .steps {
+            background: #f8f9ff;
+            padding: 30px;
+            border-radius: 12px;
+            margin: 30px 0;
+        }
+
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .step:last-child {
+            margin-bottom: 0;
+        }
+
+        .step-number {
+            background: #6b46c1;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .step-content h4 {
+            font-size: 1.125rem;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+
+        .step-content p {
+            font-size: 1rem;
+            color: #666;
+            margin: 0;
+        }
+
+        .cta-section {
+            text-align: center;
+            padding: 40px;
+            background: linear-gradient(135deg, #6b46c1 0%, #8b5cf6 100%);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(107, 70, 193, 0.3);
+        }
+
+        .cta-section h2 {
+            font-size: 2rem;
+            color: white;
+            margin-bottom: 16px;
+        }
+
+        .cta-section p {
+            font-size: 1.125rem;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 32px;
+        }
+
+        .chat-btn {
+            background: white;
+            color: #6b46c1;
+            border: none;
+            padding: 16px 32px;
+            font-size: 1.125rem;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .chat-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .icon {
+            font-size: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px 16px;
+            }
+
+            .header h1 {
+                font-size: 2.5rem;
+            }
+
+            .content {
+                padding: 30px 24px;
+            }
+
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 SDRF-GPT</h1>
+            <p>基于最新大语言模型的智能对话助手</p>
+        </div>
+
+        <div class="content">
+            <div class="section">
+                <h2>
+                    <span class="icon">✨</span>
+                    什么是 SDRF-GPT？
+                </h2>
+                <p>SDRF-GPT 是一个基于 Google Gemini 2.5 Pro 模型构建的智能对话助手，采用 LangChain 框架开发，具备强大的自然语言理解和生成能力。无论是日常聊天、学习辅导、工作协助还是创意写作，SDRF-GPT 都能为您提供高质量的对话体验。</p>
+            </div>
+
+            <div class="section">
+                <h2>
+                    <span class="icon">🎯</span>
+                    核心功能
+                </h2>
+                <div class="features">
+                    <div class="feature">
+                        <h3>💬 多轮对话</h3>
+                        <p>支持上下文记忆的连续对话，能够理解对话历史并提供相关回复</p>
+                    </div>
+                    <div class="feature">
+                        <h3>📝 会话管理</h3>
+                        <p>支持多个会话同时进行，每个会话独立管理，可重命名和查看历史记录</p>
+                    </div>
+                    <div class="feature">
+                        <h3>⚡ 实时响应</h3>
+                        <p>采用流式输出技术，提供实时的对话反馈，提升用户体验</p>
+                    </div>
+                    <div class="feature">
+                        <h3>🎨 简洁界面</h3>
+                        <p>现代化的用户界面设计，操作简单直观，专注于对话体验</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>
+                    <span class="icon">🚀</span>
+                    如何使用
+                </h2>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h4>开始对话</h4>
+                            <p>点击下方"开始聊天"按钮，进入对话界面，在输入框中输入您想要询问的问题或想要讨论的话题。</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h4>管理会话</h4>
+                            <p>使用左侧面板创建新对话或切换到之前的会话。每个会话都会保存对话历史，您可以随时返回继续对话。</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h4>个性化设置</h4>
+                            <p>您可以为每个会话重命名，方便管理不同主题的对话。点击会话旁边的编辑按钮即可重命名。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>
+                    <span class="icon">💡</span>
+                    使用技巧
+                </h2>
+                <p><strong>明确表达：</strong>尽量清楚地描述您的问题或需求，这样 AI 能够更准确地理解并提供帮助。</p>
+                <p><strong>分步提问：</strong>对于复杂的问题，可以分步骤提问，逐步深入讨论。</p>
+                <p><strong>利用上下文：</strong>在同一个会话中，AI 会记住之前的对话内容，您可以基于之前的回答继续深入讨论。</p>
+                <p><strong>多样化交互：</strong>可以让 AI 帮助您进行创意写作、代码解析、学习辅导、方案制定等多种任务。</p>
+            </div>
+        </div>
+
+        <div class="cta-section">
+            <h2>准备好开始了吗？</h2>
+            <p>立即体验 SDRF-GPT 的智能对话服务</p>
+            <a href="/chat" class="chat-btn">🚀 开始聊天</a>
+        </div>
+    </div>
+</body>
+</html>

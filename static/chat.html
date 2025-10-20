@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDRF-GPT - AI 助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f9f9f9;
+            color: #1a1a1a;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: 260px;
+            background: #fff;
+            border-right: 1px solid #e5e5e5;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+        }
+
+        .home-btn {
+            background: #f5f5f5;
+            color: #666;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            transition: background 0.2s;
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .home-btn:hover {
+            background: #e5e5e5;
+        }
+
+        .new-chat-btn {
+            background: #6b46c1;
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 16px;
+            transition: background 0.2s;
+        }
+
+        .new-chat-btn:hover {
+            background: #5a3ba8;
+        }
+
+        .sessions {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .session-item {
+            padding: 10px 12px;
+            margin: 4px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .session-item:hover {
+            background: #f5f5f5;
+        }
+
+        .session-item.active {
+            background: #ebebeb;
+            font-weight: 500;
+        }
+
+        .session-item .session-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .session-item .rename-btn {
+            opacity: 0;
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            padding: 2px 6px;
+            font-size: 12px;
+            transition: opacity 0.2s;
+        }
+
+        .session-item:hover .rename-btn {
+            opacity: 1;
+        }
+
+        .session-item .rename-btn:hover {
+            color: #6b46c1;
+        }
+
+        /* 重命名输入框 */
+        .rename-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #6b46c1;
+            border-radius: 4px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        /* 主聊天区 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+        }
+
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* 消息样式 */
+        .message {
+            display: flex;
+            gap: 16px;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .avatar.user {
+            background: #6b46c1;
+            color: white;
+        }
+
+        .avatar.assistant {
+            background: #f0f0f0;
+            color: #1a1a1a;
+        }
+
+        .message-content {
+            flex: 1;
+            line-height: 1.6;
+            font-size: 15px;
+            white-space: pre-wrap;
+        }
+
+        .message.user .message-content {
+            background: #f5f5f5;
+            padding: 12px 16px;
+            border-radius: 12px;
+        }
+
+        /* 状态信息样式 */
+        .status-message {
+            background: #fffbf0;
+            color: #8b5a00;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin: 8px 0;
+            border-left: 3px solid #f59e0b;
+        }
+
+        .success-message {
+            background: #f0f9ff;
+            color: #1e40af;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin: 8px 0;
+            border-left: 3px solid #3b82f6;
+        }
+
+        .error-message {
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin: 8px 0;
+            border-left: 3px solid #ef4444;
+        }
+
+        /* SDRF表格样式 */
+        .sdrf-table-container {
+            margin: 16px 0;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e5e5e5;
+            background: #fff;
+        }
+
+        .sdrf-table-header {
+            background: #6b46c1;
+            color: white;
+            padding: 12px 16px;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sdrf-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .sdrf-table th {
+            background: #f8f9fa;
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 1px solid #e5e5e5;
+            color: #555;
+            font-size: 12px;
+        }
+
+        .sdrf-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #333;
+        }
+
+        .sdrf-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .sdrf-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* 表格操作按钮 */
+        .table-actions {
+            padding: 12px 16px;
+            background: #f8f9fa;
+            border-top: 1px solid #e5e5e5;
+            display: flex;
+            gap: 8px;
+        }
+
+        .table-btn {
+            background: #6b46c1;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .table-btn:hover {
+            background: #5a3ba8;
+        }
+
+        .table-btn.secondary {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .table-btn.secondary:hover {
+            background: #e5e5e5;
+        }
+
+        /* 输入区 */
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid #e5e5e5;
+            background: #fff;
+        }
+
+        .input-wrapper {
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .input-box {
+            width: 100%;
+            padding: 14px 90px 14px 16px;
+            border: 1px solid #e5e5e5;
+            border-radius: 12px;
+            font-size: 15px;
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            transition: border-color 0.2s;
+            max-height: 200px;
+            min-height: 48px;
+        }
+
+        .input-box:focus {
+            border-color: #6b46c1;
+        }
+
+        .file-btn {
+            position: absolute;
+            right: 50px;
+            bottom: 10px;
+            background: #f5f5f5;
+            color: #666;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .file-btn:hover {
+            background: #e5e5e5;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .send-btn {
+            position: absolute;
+            right: 10px;
+            bottom: 10px;
+            background: #6b46c1;
+            color: white;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            background: #5a3ba8;
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 加载动画 */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 8px 0;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #999;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                opacity: 0.3;
+            }
+            30% {
+                opacity: 1;
+            }
+        }
+
+        /* 欢迎界面 */
+        .welcome {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #666;
+        }
+
+        .welcome h1 {
+            font-size: 32px;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+
+        .welcome p {
+            font-size: 16px;
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #999;
+        }
+
+        /* 进度指示器 */
+        .progress-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #f0f9ff;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #1e40af;
+            margin: 8px 0;
+        }
+
+        .progress-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e5e7eb;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- 侧边栏 -->
+    <div class="sidebar">
+        <a href="/home" class="home-btn">← 返回首页</a>
+        <button class="new-chat-btn" onclick="newChat()">+ 新对话</button>
+        <div class="sessions" id="sessions"></div>
+    </div>
+
+    <!-- 主聊天区 -->
+    <div class="main-content">
+        <div class="chat-container" id="chatContainer">
+            <div class="welcome">
+                <h1>🤖 SDRF-GPT</h1>
+                <p>我是你的AI助手,有什么可以帮你的吗?</p>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-wrapper">
+                <textarea
+                    class="input-box"
+                    id="userInput"
+                    placeholder="发送消息..."
+                    rows="1"
+                    onkeydown="handleKeyDown(event)"
+                ></textarea>
+                <input
+                    type="file"
+                    id="fileInput"
+                    class="file-input"
+                    accept=".pdf,.csv,.txt"
+                    multiple
+                    onchange="handleFileUpload(event)"
+                />
+                <button class="file-btn" onclick="document.getElementById('fileInput').click()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        let currentSessionId = generateSessionId();
+        let isLoading = false;
+        let uploadedFileContent = null;
+
+        // 生成会话ID
+        function generateSessionId() {
+            return 'session_' + Date.now();
+        }
+
+        // 新对话
+        function newChat() {
+            currentSessionId = generateSessionId();
+            document.getElementById('chatContainer').innerHTML = `
+                <div class="welcome">
+                    <h1>🤖 SDRF-GPT</h1>
+                    <p>我是你的AI助手,有什么可以帮你的吗?</p>
+                </div>
+            `;
+            loadSessions();
+        }
+
+        // 处理键盘事件
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // 处理多文件上传
+        async function handleFileUpload(event) {
+            const files = Array.from(event.target.files);
+            if (files.length === 0) return;
+
+            const formData = new FormData();
+            files.forEach(file => formData.append('files', file));
+
+            try {
+                const input = document.getElementById('userInput');
+                input.placeholder = `正在处理 ${files.length} 个文件...`;
+                input.disabled = true;
+
+                const response = await fetch(`${API_URL}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    uploadedFileContent = result.content;
+                    const fileNames = result.filenames.join('，');
+                    input.value = `已上传文件：${fileNames}`;
+                    input.placeholder = '发送消息...';
+                } else {
+                    alert('文件上传失败');
+                }
+            } catch (error) {
+                alert('文件上传错误: ' + error.message);
+            } finally {
+                const input = document.getElementById('userInput');
+                input.disabled = false;
+                input.focus();
+                event.target.value = '';
+            }
+        }
+
+        // 添加状态消息
+        function addStatusMessage(content, type = 'status') {
+            const messageDiv = document.createElement('div');
+
+            if (type === 'status') {
+                messageDiv.className = 'status-message';
+                if (content.includes('检测到输出被截断')) {
+                    messageDiv.innerHTML = `
+                        <div class="progress-indicator">
+                            <div class="progress-spinner"></div>
+                            ${content}
+                        </div>
+                    `;
+                } else {
+                    messageDiv.textContent = content;
+                }
+            } else if (type === 'success') {
+                messageDiv.className = 'success-message';
+                messageDiv.textContent = content;
+            } else if (type === 'error') {
+                messageDiv.className = 'error-message';
+                messageDiv.textContent = content;
+            }
+
+            const container = document.getElementById('chatContainer');
+            container.appendChild(messageDiv);
+            scrollToBottom();
+            return messageDiv;
+        }
+
+        // 发送消息
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const message = input.value.trim();
+
+            if (!message || isLoading) return;
+
+            // 如果有上传的文件内容，将其添加到消息中
+            let fullMessage = message;
+            if (uploadedFileContent) {
+                fullMessage = `${uploadedFileContent}\n\n用户问题：${message}`;
+                uploadedFileContent = null; // 清空文件内容
+            }
+
+            // 清空输入框
+            input.value = '';
+            input.style.height = 'auto';
+
+            // 移除欢迎界面
+            const welcome = document.querySelector('.welcome');
+            if (welcome) welcome.remove();
+
+            // 显示用户消息
+            addMessage(message, 'user');
+
+            // 显示加载状态
+            isLoading = true;
+            updateSendButton();
+            const assistantMsg = addMessage('', 'assistant', true);
+
+            try {
+                // 调用流式API
+                const response = await fetch(`${API_URL}/chat/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: fullMessage,
+                        session_id: currentSessionId
+                    })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullContent = '';
+
+                while (true) {
+                    const {value, done} = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') break;
+
+                            try {
+                                const json = JSON.parse(data);
+                                console.log('收到数据:', json);
+
+                                if (json.type === 'text') {
+                                    // 普通文本内容
+                                    const content = json.content;
+
+                                    // 检查是否是状态消息
+                                    if (content.includes('[检测到输出被截断')) {
+                                        // 显示状态消息，不添加到主回复中
+                                        addStatusMessage(content.replace(/[\[\]]/g, ''), 'status');
+                                    } else if (content.includes('✅ 成功合并')) {
+                                        // 显示成功消息
+                                        addStatusMessage(content, 'success');
+                                    } else if (content.includes('❌ JSON数据解析失败')) {
+                                        // 显示错误消息
+                                        addStatusMessage(content, 'error');
+                                    } else {
+                                        // 正常的文本内容
+                                        fullContent += content;
+                                        assistantMsg.querySelector('.message-content').textContent = fullContent;
+                                    }
+                                } else if (json.type === 'sdrf_json') {
+                                    console.log('检测到SDRF JSON数据，行数:', json.data.length); // 调试
+                                    // SDRF JSON数据 - 添加表格
+                                    addSdrfTable(assistantMsg, json.data);
+                                }
+
+                                scrollToBottom();
+                            } catch (e) {
+                                console.error('解析JSON失败:', e);
+                            }
+                        }
+                    }
+                }
+
+                // 移除加载动画
+                const typing = assistantMsg.querySelector('.typing-indicator');
+                if (typing) typing.remove();
+
+            } catch (error) {
+                assistantMsg.querySelector('.message-content').textContent = '抱歉,发生了错误: ' + error.message;
+                addStatusMessage('网络连接错误，请重试', 'error');
+            } finally {
+                isLoading = false;
+                updateSendButton();
+                loadSessions();
+            }
+        }
+
+        // 添加SDRF表格
+        // 添加SDRF表格
+        function addSdrfTable(messageElement, data) {
+            const messageContent = messageElement.querySelector('.message-content');
+
+            // 创建表格容器
+            const tableContainer = document.createElement('div');
+            tableContainer.className = 'sdrf-table-container';
+
+            // 获取所有唯一的列名
+            const allColumns = new Set();
+            data.forEach(row => {
+                Object.keys(row).forEach(key => allColumns.add(key));
+            });
+            const columns = Array.from(allColumns);
+
+            // 表格头部
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'sdrf-table-header';
+            headerDiv.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h10v2H7V7zm0 4h10v2H7v-2zm0 4h10v2H7v-2z"/>
+                </svg>
+                SDRF 数据表格 (${data.length} 行)
+            `;
+
+            // 创建表格
+            const table = document.createElement('table');
+            table.className = 'sdrf-table';
+
+            // 表头
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            columns.forEach(col => {
+                const th = document.createElement('th');
+                th.textContent = col;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            // 表体
+            const tbody = document.createElement('tbody');
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                columns.forEach(col => {
+                    const td = document.createElement('td');
+                    td.textContent = row[col] || '';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+
+            // 操作按钮
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'table-actions';
+
+            const downloadBtn = document.createElement('button');
+            downloadBtn.className = 'table-btn';
+            downloadBtn.textContent = '下载 CSV';
+            downloadBtn.onclick = () => downloadCsv(data);
+
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'table-btn secondary';
+            copyBtn.textContent = '复制数据';
+            copyBtn.onclick = () => copyTable(data);
+
+            actionsDiv.appendChild(downloadBtn);
+            actionsDiv.appendChild(copyBtn);
+
+            // 组装
+            tableContainer.appendChild(headerDiv);
+            tableContainer.appendChild(table);
+            tableContainer.appendChild(actionsDiv);
+
+            messageContent.appendChild(tableContainer);
+        }
+
+        // 下载CSV文件
+        function downloadCsv(data) {
+            if (!data || data.length === 0) return;
+
+            // 获取所有列名
+            const columns = new Set();
+            data.forEach(row => {
+                Object.keys(row).forEach(key => columns.add(key));
+            });
+            const headers = Array.from(columns);
+
+            // 构建CSV内容
+            let csvContent = headers.join(',') + '\n';
+            data.forEach(row => {
+                const values = headers.map(header => {
+                    const value = row[header] || '';
+                    // 如果值包含逗号、引号或换行符，需要用引号包围并转义引号
+                    if (value.toString().includes(',') || value.toString().includes('"') || value.toString().includes('\n')) {
+                        return '"' + value.toString().replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                });
+                csvContent += values.join(',') + '\n';
+            });
+
+            // 创建下载链接
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `sdrf_data_${new Date().getTime()}.csv`;
+            link.click();
+        }
+
+        // 复制表格数据
+        // 复制表格数据
+        function copyTable(data) {
+            if (!data || data.length === 0) return;
+
+            // 获取所有列名
+            const columns = new Set();
+            data.forEach(row => {
+                Object.keys(row).forEach(key => columns.add(key));
+            });
+            const headers = Array.from(columns);
+
+            // 构建制表符分隔的文本
+            let textContent = headers.join('\t') + '\n';
+            data.forEach(row => {
+                const values = headers.map(header => row[header] || '');
+                textContent += values.join('\t') + '\n';
+            });
+
+            // 复制到剪贴板
+            navigator.clipboard.writeText(textContent).then(() => {
+                alert('数据已复制到剪贴板!');
+            }).catch(err => {
+                console.error('复制失败:', err);
+                alert('复制失败，请手动选择复制');
+            });
+        }
+        // 添加消息
+        function addMessage(content, role, showTyping = false) {
+            const container = document.getElementById('chatContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+
+            const avatar = role === 'user' ? 'U' : 'AI';
+            const avatarClass = role === 'user' ? 'user' : 'assistant';
+
+            messageDiv.innerHTML = `
+                <div class="avatar ${avatarClass}">${avatar}</div>
+                <div class="message-content">
+                    ${showTyping ? '<div class="typing-indicator"><span></span><span></span><span></span></div>' : content}
+                </div>
+            `;
+
+            container.appendChild(messageDiv);
+            scrollToBottom();
+            return messageDiv;
+        }
+
+        // 滚动到底部
+        function scrollToBottom() {
+            const container = document.getElementById('chatContainer');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 更新发送按钮状态
+        function updateSendButton() {
+            const btn = document.getElementById('sendBtn');
+            btn.disabled = isLoading;
+        }
+
+        // 加载会话列表
+        async function loadSessions() {
+            try {
+                const response = await fetch(`${API_URL}/sessions`);
+                const data = await response.json();
+
+                const sessionsDiv = document.getElementById('sessions');
+                sessionsDiv.innerHTML = data.sessions.map(session => `
+                    <div class="session-item ${session.id === currentSessionId ? 'active' : ''}"
+                         onclick="loadSession('${session.id}')">
+                        <span class="session-name">${session.title}</span>
+                        <button class="rename-btn" onclick="event.stopPropagation(); startRename('${session.id}', '${session.title}')">✏️</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('加载会话失败:', error);
+            }
+        }
+
+        // 加载会话历史
+        async function loadSession(sessionId) {
+            currentSessionId = sessionId;
+
+            try {
+                // 获取历史记录
+                const response = await fetch(`${API_URL}/sessions/${sessionId}/history`);
+                const data = await response.json();
+
+                // 清空聊天容器
+                const container = document.getElementById('chatContainer');
+                container.innerHTML = '';
+
+                // 如果有历史记录，显示历史消息
+                if (data.history && data.history.length > 0) {
+                    data.history.forEach(msg => {
+                        addMessage(msg.content, msg.role);
+                    });
+                } else {
+                    // 没有历史记录，显示欢迎界面
+                    container.innerHTML = `
+                        <div class="welcome">
+                            <h1>🤖 SDRF-GPT</h1>
+                            <p>在这个会话中继续聊天吧!</p>
+                        </div>
+                    `;
+                }
+
+                loadSessions();
+            } catch (error) {
+                console.error('加载会话历史失败:', error);
+            }
+        }
+
+        // 开始重命名
+        function startRename(sessionId, currentTitle) {
+            const sessionsDiv = document.getElementById('sessions');
+            const sessionItems = sessionsDiv.querySelectorAll('.session-item');
+
+            sessionItems.forEach(item => {
+                if (item.querySelector('.session-name').textContent === currentTitle) {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'rename-input';
+                    input.value = currentTitle;
+
+                    // 替换内容
+                    item.innerHTML = '';
+                    item.appendChild(input);
+                    input.focus();
+                    input.select();
+
+                    // 回车保存
+                    input.onkeydown = async (e) => {
+                        if (e.key === 'Enter') {
+                            await saveRename(sessionId, input.value);
+                        } else if (e.key === 'Escape') {
+                            await loadSessions();
+                        }
+                    };
+
+                    // 失去焦点保存
+                    input.onblur = async () => {
+                        await saveRename(sessionId, input.value);
+                    };
+                }
+            });
+        }
+
+        // 保存重命名
+        async function saveRename(sessionId, newName) {
+            if (!newName.trim()) {
+                await loadSessions();
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/sessions/rename`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        new_name: newName.trim()
+                    })
+                });
+
+                if (response.ok) {
+                    await loadSessions();
+                }
+            } catch (error) {
+                console.error('重命名失败:', error);
+                await loadSessions();
+            }
+        }
+
+        // 自动调整输入框高度
+        document.getElementById('userInput').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+        });
+
+        // 初始化
+        loadSessions();
+    </script>
+</body>
+</html>

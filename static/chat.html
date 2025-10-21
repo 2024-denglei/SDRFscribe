@@ -175,7 +175,42 @@
             border-radius: 8px;
             padding: 15px;
             max-width: 100%;
-            overflow-x: auto;
+            border: 1px solid #e0e0e0;
+        }
+
+        .data-stats {
+            background: linear-gradient(135deg, #e7f3ff 0%, #f0e7ff 100%);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .stats-info {
+            font-size: 13px;
+            color: #0066cc;
+            font-weight: 500;
+        }
+
+        .stats-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            background: white;
+            border-radius: 12px;
+            margin-right: 8px;
+            font-weight: bold;
+        }
+
+        .table-wrapper {
+            overflow: auto;
+            max-height: 500px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
         }
 
         .sdrf-table {
@@ -187,66 +222,128 @@
         .sdrf-table th {
             background: #667eea;
             color: white;
-            padding: 10px 8px;
+            padding: 12px 8px;
             text-align: left;
             font-weight: bold;
             position: sticky;
             top: 0;
+            z-index: 10;
+            white-space: nowrap;
+            border-right: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .sdrf-table th:last-child {
+            border-right: none;
         }
 
         .sdrf-table td {
-            padding: 8px;
+            padding: 10px 8px;
             border-bottom: 1px solid #e0e0e0;
+            border-right: 1px solid #f0f0f0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 250px;
+        }
+
+        .sdrf-table td:last-child {
+            border-right: none;
         }
 
         .sdrf-table tr:hover {
             background: #f8f9fa;
         }
 
+        .sdrf-table tr:nth-child(even) {
+            background: #fafbfc;
+        }
+
+        .sdrf-table tr:nth-child(even):hover {
+            background: #f0f2f5;
+        }
+
         .table-controls {
-            margin-top: 10px;
+            margin-top: 12px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
         }
 
         .pagination {
             display: flex;
-            gap: 5px;
+            gap: 8px;
             align-items: center;
         }
 
         .pagination button {
-            padding: 5px 12px;
-            border: 1px solid #667eea;
+            padding: 6px 14px;
+            border: 2px solid #667eea;
             background: white;
             color: #667eea;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
         }
 
-        .pagination button.active {
+        .pagination button:hover:not(:disabled) {
             background: #667eea;
             color: white;
         }
 
         .pagination button:disabled {
-            opacity: 0.5;
+            opacity: 0.4;
             cursor: not-allowed;
+            border-color: #ccc;
+            color: #999;
+        }
+
+        .pagination-info {
+            padding: 6px 12px;
+            background: white;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #666;
         }
 
         .download-btn {
-            padding: 8px 15px;
-            background: #28a745;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
             color: white;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .download-btn:hover {
-            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+        }
+
+        .page-size-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .page-size-selector select {
+            padding: 6px 10px;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            background: white;
         }
 
         .input-area {
@@ -325,13 +422,11 @@
             100% { transform: rotate(360deg); }
         }
 
-        .data-stats {
-            background: #e7f3ff;
-            padding: 10px;
-            border-radius: 8px;
-            margin-top: 10px;
-            font-size: 13px;
-            color: #0066cc;
+        .scroll-hint {
+            font-size: 11px;
+            color: #999;
+            margin-top: 5px;
+            font-style: italic;
         }
     </style>
 </head>
@@ -536,7 +631,7 @@
                 const decoder = new TextDecoder();
                 let buffer = '';
                 let currentMessage = '';
-                let sdrfData = null;  // Store SDRF data
+                let sdrfData = null;
 
                 while (true) {
                     const {value, done} = await reader.read();
@@ -558,7 +653,6 @@
                                     currentMessage += parsed.content;
                                     updateLastMessage(currentMessage);
                                 } else if (parsed.type === 'sdrf_json') {
-                                    // Save SDRF data, display after stream ends
                                     sdrfData = parsed.data;
                                     console.log('✅ Received SDRF data:', sdrfData.length, 'rows');
                                 }
@@ -569,15 +663,12 @@
                     }
                 }
 
-                // Ensure assistant message container exists
                 if (!currentMessage && !sdrfData) {
                     addMessage('assistant', '');
                 }
 
-                // After stream ends, display SDRF table
                 if (sdrfData && sdrfData.length > 0) {
-                    console.log('📊 Starting to display SDRF table...');
-                    // Wait for DOM update
+                    console.log('📊 Displaying SDRF table...');
                     await new Promise(resolve => setTimeout(resolve, 100));
                     displaySDRFTable(sdrfData);
                 }
@@ -632,7 +723,7 @@
                 .replace(/`(.*?)`/g, '<code>$1</code>');
         }
 
-        // Display SDRF table (with pagination)
+        // Display SDRF table with enhanced features
         function displaySDRFTable(data) {
             console.log('📊 displaySDRFTable called, data rows:', data.length);
 
@@ -644,15 +735,36 @@
             const container = document.createElement('div');
             container.className = 'sdrf-table-container';
 
-            // Data statistics
+            // Calculate statistics
+            const columnCount = Object.keys(data[0]).length;
+            const rowCount = data.length;
+
+            // Data statistics with badges
             const stats = document.createElement('div');
             stats.className = 'data-stats';
-            stats.innerHTML = `📊 Data Statistics: ${data.length} rows × ${Object.keys(data[0]).length} columns`;
+            stats.innerHTML = `
+                <div class="stats-info">
+                    <span class="stats-badge">📊 ${rowCount}</span> rows
+                    <span class="stats-badge">📋 ${columnCount}</span> columns
+                </div>
+                <div class="scroll-hint">💡 Scroll horizontally and vertically to view all data</div>
+            `;
             container.appendChild(stats);
 
-            const pageSize = 50;
+            // Table settings
+            let pageSize = 20;
             let currentPage = 0;
             const totalPages = Math.ceil(data.length / pageSize);
+
+            // Create table wrapper
+            const tableDiv = document.createElement('div');
+            tableDiv.className = 'table-wrapper';
+            container.appendChild(tableDiv);
+
+            // Create controls
+            const controlsDiv = document.createElement('div');
+            controlsDiv.className = 'table-controls';
+            container.appendChild(controlsDiv);
 
             function renderPage() {
                 const start = currentPage * pageSize;
@@ -661,60 +773,70 @@
 
                 let tableHTML = '<table class="sdrf-table"><thead><tr>';
                 Object.keys(data[0]).forEach(key => {
-                    tableHTML += `<th>${key}</th>`;
+                    tableHTML += `<th title="${key}">${key}</th>`;
                 });
                 tableHTML += '</tr></thead><tbody>';
 
-                pageData.forEach(row => {
-                    tableHTML += '<tr>';
+                pageData.forEach((row, idx) => {
+                    tableHTML += `<tr>`;
                     Object.values(row).forEach(value => {
-                        tableHTML += `<td>${value}</td>`;
+                        const displayValue = value || '';
+                        tableHTML += `<td title="${displayValue}">${displayValue}</td>`;
                     });
                     tableHTML += '</tr>';
                 });
                 tableHTML += '</tbody></table>';
 
-                const tableDiv = container.querySelector('.table-wrapper') || document.createElement('div');
-                tableDiv.className = 'table-wrapper';
                 tableDiv.innerHTML = tableHTML;
-
-                if (!container.querySelector('.table-wrapper')) {
-                    container.appendChild(tableDiv);
-                }
-
-                // Update pagination controls
-                updatePagination();
+                updateControls();
             }
 
-            function updatePagination() {
-                let controlsHTML = `
-                    <div class="table-controls">
-                        <div class="pagination">
-                            <button onclick="sdrf_prevPage()" ${currentPage === 0 ? 'disabled' : ''}>Previous</button>
-                            <span>Page ${currentPage + 1} / ${totalPages} (showing ${currentPage * pageSize + 1}-${Math.min((currentPage + 1) * pageSize, data.length)} / ${data.length})</span>
-                            <button onclick="sdrf_nextPage()" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Next</button>
-                        </div>
-                        <button class="download-btn" onclick="downloadSDRF()">📥 Download TSV</button>
+            function updateControls() {
+                const start = currentPage * pageSize + 1;
+                const end = Math.min((currentPage + 1) * pageSize, data.length);
+
+                controlsDiv.innerHTML = `
+                    <div class="pagination">
+                        <button onclick="window.sdrf_firstPage()" ${currentPage === 0 ? 'disabled' : ''}>⏮️ First</button>
+                        <button onclick="window.sdrf_prevPage()" ${currentPage === 0 ? 'disabled' : ''}>⬅️ Previous</button>
+                        <span class="pagination-info">Page ${currentPage + 1} of ${totalPages} (${start}-${end} / ${data.length})</span>
+                        <button onclick="window.sdrf_nextPage()" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Next ➡️</button>
+                        <button onclick="window.sdrf_lastPage()" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Last ⏭️</button>
                     </div>
+                    <div class="page-size-selector">
+                        <label>Rows per page:</label>
+                        <select onchange="window.sdrf_changePageSize(this.value)">
+                            <option value="10" ${pageSize === 10 ? 'selected' : ''}>10</option>
+                            <option value="20" ${pageSize === 20 ? 'selected' : ''}>20</option>
+                            <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
+                            <option value="100" ${pageSize === 100 ? 'selected' : ''}>100</option>
+                            <option value="${data.length}">All (${data.length})</option>
+                        </select>
+                    </div>
+                    <button class="download-btn" onclick="window.downloadSDRF()">
+                        <span>📥</span>
+                        <span>Download TSV</span>
+                    </button>
                 `;
-
-                const controlsDiv = container.querySelector('.table-controls-wrapper') || document.createElement('div');
-                controlsDiv.className = 'table-controls-wrapper';
-                controlsDiv.innerHTML = controlsHTML;
-
-                if (!container.querySelector('.table-controls-wrapper')) {
-                    container.appendChild(controlsDiv);
-                }
             }
 
             // Global functions for pagination
             window.currentSDRFData = data;
+            window.currentPageSize = pageSize;
+            window.currentPageNum = currentPage;
+
+            window.sdrf_firstPage = function() {
+                currentPage = 0;
+                renderPage();
+            };
+
             window.sdrf_prevPage = function() {
                 if (currentPage > 0) {
                     currentPage--;
                     renderPage();
                 }
             };
+
             window.sdrf_nextPage = function() {
                 if (currentPage < totalPages - 1) {
                     currentPage++;
@@ -722,9 +844,20 @@
                 }
             };
 
+            window.sdrf_lastPage = function() {
+                currentPage = totalPages - 1;
+                renderPage();
+            };
+
+            window.sdrf_changePageSize = function(newSize) {
+                pageSize = parseInt(newSize);
+                currentPage = 0;
+                renderPage();
+            };
+
             renderPage();
 
-            // Find last assistant message
+            // Find and append to last assistant message
             const messagesDiv = document.getElementById('messages');
             const assistantMessages = messagesDiv.querySelectorAll('.message.assistant');
             const lastMessage = assistantMessages[assistantMessages.length - 1];
@@ -732,9 +865,8 @@
             if (lastMessage) {
                 const contentDiv = lastMessage.querySelector('.message-content');
                 if (contentDiv) {
-                    console.log('✅ Found message container, adding table');
+                    console.log('✅ Table added successfully');
                     contentDiv.appendChild(container);
-                    // Scroll to bottom
                     messagesDiv.scrollTop = messagesDiv.scrollHeight;
                 } else {
                     console.error('❌ Cannot find message-content');
@@ -745,7 +877,7 @@
         }
 
         // Download SDRF as TSV
-        function downloadSDRF() {
+        window.downloadSDRF = function() {
             const data = window.currentSDRFData;
             if (!data || data.length === 0) return;
 
@@ -754,14 +886,16 @@
                 tsv += Object.values(row).join('\t') + '\n';
             });
 
-            const blob = new Blob([tsv], {type: 'text/tab-separated-values'});
+            const blob = new Blob([tsv], {type: 'text/tab-separated-values;charset=utf-8'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `sdrf_${Date.now()}.tsv`;
+            a.download = `sdrf_export_${Date.now()}.tsv`;
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
             URL.revokeObjectURL(url);
-        }
+        };
 
         // Send on Enter key press
         function handleKeyPress(event) {

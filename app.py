@@ -1,7 +1,7 @@
 """
-LangChain Web Chat Assistant - Optimized Backend Service
-Supports session management, SDRF JSON compression format parsing, auto-continuation
-Optimized for large dataset processing, supports multiple compression formats
+LangChain Web Chat Assistant - Simplified Backend Service
+Supports ONLY compressed_matrix format for SDRF data
+Removed legacy format compatibility for cleaner, faster processing
 """
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
@@ -42,13 +42,13 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 class SDRFJsonParser:
-    """SDRF JSON Data Parser - Supports multiple compression formats and truncation detection"""
+    """SDRF JSON Data Parser - Supports compressed_matrix format only"""
 
     def __init__(self):
         self.json_parser = JsonOutputParser()
 
     def is_sdrf_json(self, text: str) -> bool:
-        """Determine if text contains SDRF format JSON data"""
+        """Determine if text contains compressed_matrix format JSON data"""
         try:
             json_match = re.search(r'```json\s*(.*?)\s*```', text, re.DOTALL)
             if json_match:
@@ -58,82 +58,21 @@ class SDRFJsonParser:
 
             data = json.loads(json_str)
 
-            # Check various possible formats
+            # Only check for compressed_matrix format
             if isinstance(data, dict):
-                # Compressed format
-                if self._is_compressed_format(data):
-                    return True
-                # Standard object format
-                return self._is_sdrf_object_format(data)
-            # Standard array format
-            elif isinstance(data, list) and len(data) > 0:
-                return self._is_sdrf_array_format(data)
+                return self._is_compressed_matrix_format(data)
 
             return False
 
         except (json.JSONDecodeError, KeyError, TypeError):
             return False
 
-    def _is_compressed_format(self, data: dict) -> bool:
-        """Check if it's compressed format"""
-        # Template compression format
-        if "format_type" in data and data["format_type"] == "compressed_template":
-            return "template" in data and "variable_data" in data
-        # Matrix compression format
+    def _is_compressed_matrix_format(self, data: dict) -> bool:
+        """Check if it's compressed_matrix format"""
         if "format_type" in data and data["format_type"] == "compressed_matrix":
-            return "field_names" in data and "data_matrix" in data
-        # Compatible with old compression formats without format_type marker
-        if "template" in data and "variable_data" in data:
-            return True
-        if "field_names" in data and "data_matrix" in data:
-            return True
+            return ("template" in data and "constant_attributes" in data and
+                    "verity_attributes" in data and "verity_attributes_matrix" in data)
         return False
-
-    def _is_sdrf_object_format(self, data: dict) -> bool:
-        """Check if it's SDRF standard object format {"field": [...], ...}"""
-        if not isinstance(data, dict) or len(data) == 0:
-            return False
-
-        sdrf_fields = [
-            "source name",
-            "characteristics[organism]",
-            "characteristics[age]",
-            "characteristics[sex]",
-            "characteristics[disease]",
-            "characteristics[organism part]",
-            "characteristics[cell type]",
-            "technology type",
-            "comment[data file]",
-            "comment[label]"
-        ]
-
-        has_sdrf_field = any(field in data for field in sdrf_fields)
-        if not has_sdrf_field:
-            return False
-
-        # Check if all field values are arrays
-        for key, value in data.items():
-            if not isinstance(value, list):
-                return False
-
-        return True
-
-    def _is_sdrf_array_format(self, data: list) -> bool:
-        """Check if it's SDRF array format [{...}, {...}, ...]"""
-        first_item = data[0]
-        if not isinstance(first_item, dict):
-            return False
-
-        sdrf_fields = [
-            "source name",
-            "characteristics[organism]",
-            "characteristics[age]",
-            "technology type",
-            "comment[data file]"
-        ]
-
-        has_sdrf_field = any(field in first_item for field in sdrf_fields)
-        return has_sdrf_field
 
     def is_json_truncated(self, text: str) -> bool:
         """Detect if JSON data is truncated"""
@@ -147,7 +86,6 @@ class SDRFJsonParser:
         if not has_json_end:
             return True
 
-        # Check JSON structure integrity
         try:
             json_content = self.extract_partial_json(text)
             json.loads(json_content)
@@ -174,16 +112,11 @@ class SDRFJsonParser:
 
             data = json.loads(json_str)
 
-            # Process according to format type
-            if isinstance(data, dict):
-                if self._is_compressed_format(data):
-                    return self._expand_compressed_data(data)
-                else:
-                    return self._convert_object_to_array(data)
-            elif isinstance(data, list):
-                return data
-            else:
-                return []
+            # Only process compressed_matrix format
+            if isinstance(data, dict) and self._is_compressed_matrix_format(data):
+                return self._expand_compressed_matrix_with_template(data)
+
+            return []
 
         except json.JSONDecodeError as e:
             print(f"JSON parsing error: {e}")
@@ -192,91 +125,73 @@ class SDRFJsonParser:
             print(f"Data extraction error: {e}")
             return []
 
-    def _expand_compressed_data(self, data: dict) -> List[Dict[str, Any]]:
-        """Expand compressed format data"""
-        format_type = data.get("format_type", "")
-
-        # Template compression format
-        if format_type == "compressed_template" or "template" in data:
-            return self._expand_template_format(data)
-
-        # Matrix compression format
-        elif format_type == "compressed_matrix" or "field_names" in data:
-            return self._expand_matrix_format(data)
-
-        return []
-
-    def _expand_template_format(self, data: dict) -> List[Dict[str, Any]]:
-        """Expand template compression format
+    def _expand_compressed_matrix_with_template(self, data: dict) -> List[Dict[str, Any]]:
+        """Expand compressed_matrix format with template
 
         Input format:
         {
-            "template": {"field1": "value1", ...},
-            "variable_data": [{"field2": "value2", ...}, ...]
-        }
-
-        Output: Each row is a complete SDRF record
-        """
-        template = data.get("template", {})
-        variable_data = data.get("variable_data", [])
-
-        result = []
-        for var_row in variable_data:
-            # Merge template and variable data
-            row = template.copy()
-            row.update(var_row)
-            result.append(row)
-
-        print(f"✅ Successfully expanded template format: {len(result)} rows of data")
-        return result
-
-    def _expand_matrix_format(self, data: dict) -> List[Dict[str, Any]]:
-        """Expand matrix compression format
-
-        Input format:
-        {
-            "constant_fields": {"field1": "value1", ...},
-            "field_names": ["field2", "field3", ...],
-            "data_matrix": [["value2", "value3", ...], ...]
+            "format_type": "compressed_matrix",
+            "metadata": {...},
+            "template": ["field1", "field2", ...],
+            "constant_attributes": {"field1": "value1", ...},
+            "verity_attributes": ["field3", "field4", ...],
+            "verity_attributes_matrix": [["val3", "val4", ...], ...]
         }
         """
-        constant_fields = data.get("constant_fields", {})
-        field_names = data.get("field_names", [])
-        data_matrix = data.get("data_matrix", [])
+        try:
+            template = data.get("template", [])
+            constant_attrs = data.get("constant_attributes", {})
+            verity_attrs = data.get("verity_attributes", [])
+            verity_matrix = data.get("verity_attributes_matrix", [])
+            metadata = data.get("metadata", {})
 
-        result = []
-        for matrix_row in data_matrix:
-            # First copy constant fields
-            row = constant_fields.copy()
-            # Add variable fields
-            for i, field_name in enumerate(field_names):
-                if i < len(matrix_row):
-                    row[field_name] = matrix_row[i]
-            result.append(row)
+            print(f"📊 Expanding compressed_matrix format:")
+            print(f"   - Template fields: {len(template)}")
+            print(f"   - Constant attributes: {len(constant_attrs)}")
+            print(f"   - Verity attributes: {len(verity_attrs)}")
+            print(f"   - Data rows: {len(verity_matrix)}")
 
-        print(f"✅ Successfully expanded matrix format: {len(result)} rows of data")
-        return result
+            if metadata:
+                print(f"   - Metadata: {metadata}")
 
-    def _convert_object_to_array(self, obj_data: dict) -> List[Dict[str, Any]]:
-        """Convert object format to array format"""
-        if not obj_data:
+            result = []
+
+            # Process each row in verity_attributes_matrix
+            for row_idx, verity_values in enumerate(verity_matrix):
+                # Create a new row following template order
+                row = {}
+
+                # Fill in all fields from template
+                for field_name in template:
+                    # Check if it's a constant attribute
+                    if field_name in constant_attrs:
+                        row[field_name] = constant_attrs[field_name]
+                    # Check if it's a verity attribute
+                    elif field_name in verity_attrs:
+                        verity_idx = verity_attrs.index(field_name)
+                        if verity_idx < len(verity_values):
+                            row[field_name] = verity_values[verity_idx]
+                        else:
+                            row[field_name] = ""
+                    # Field not in either, fill with default
+                    else:
+                        row[field_name] = "not available"
+
+                result.append(row)
+
+            print(f"✅ Successfully expanded: {len(result)} rows")
+
+            # Validate against metadata if available
+            if metadata and "total_rows" in metadata:
+                expected_rows = metadata["total_rows"]
+                if len(result) != expected_rows:
+                    print(f"⚠️ Warning: Expected {expected_rows} rows, got {len(result)}")
+
+            return result
+
+        except Exception as e:
+            print(f"❌ Error expanding compressed_matrix format: {e}")
             return []
-
-        # Get first field to determine row count
-        first_key = next(iter(obj_data.keys()))
-        row_count = len(obj_data[first_key])
-
-        result = []
-        for i in range(row_count):
-            row = {}
-            for key, values in obj_data.items():
-                if i < len(values):
-                    row[key] = values[i]
-                else:
-                    row[key] = ""
-            result.append(row)
-
-        return result
 
     def combine_json_parts(self, parts: List[str]) -> str:
         """Combine multiple JSON fragments"""
@@ -300,16 +215,16 @@ class SDRFJsonParser:
 class Chatbot:
     def __init__(self):
         self.model = init_chat_model(
-            "gemini-2.5-flash",
+            "gemini-2.5-pro",
             model_provider="google_genai",
-            temperature=0.7,
+            temperature=0,
+            timeout=60,
         )
 
-        # Read system prompt file
         with open('system_prompt.txt', 'r', encoding='utf-8') as f:
             self.system_prompt = f.read().strip()
 
-        with open('readme.txt', 'r', encoding='utf-8') as f:
+        with open('SDRF_proteomics.txt', 'r', encoding='utf-8') as f:
             self.sdrf_proteomic = f.read().strip()
 
         self.prompt_template = ChatPromptTemplate.from_messages([
@@ -351,7 +266,8 @@ class Chatbot:
         return response.content if hasattr(response, 'content') else str(response)
 
     async def stream_chat(self, user_input: str, session_id: str):
-        """Stream chat response, supports SDRF JSON data detection and auto-continuation"""
+        """Stream chat response with enhanced JSON parsing"""
+        await asyncio.sleep(0.5)
         config = {'configurable': {'session_id': session_id}}
 
         full_response = ""
@@ -359,7 +275,6 @@ class Chatbot:
         max_continue_attempts = 5
         continue_count = 0
 
-        # First generation
         try:
             async for chunk in self.chatbot.astream(
                     {
@@ -397,7 +312,7 @@ class Chatbot:
                 await asyncio.sleep(0.5)
 
             except Exception as e:
-                print(f"Error during continuation generation: {e}")
+                print(f"Error during continuation: {e}")
                 break
 
         # Process JSON data
@@ -413,10 +328,8 @@ class Chatbot:
                     json_data = self.sdrf_parser.extract_json_data(full_response)
 
                 if json_data:
-                    # Send JSON data
                     yield f"data: {json.dumps({'type': 'sdrf_json', 'data': json_data})}\n\n"
 
-                    # Statistics
                     if continue_count > 0:
                         success_msg = f"\\n✅ Successfully merged {continue_count + 1} fragments"
                         yield f"data: {json.dumps({'content': success_msg, 'type': 'text'})}\n\n"
@@ -494,23 +407,20 @@ class RenameRequest(BaseModel):
 # Page Routes
 @app.get("/")
 async def root():
-    """Home page"""
     return FileResponse("static/home.html")
 
 
 @app.get("/home")
 async def home():
-    """Introduction page"""
     return FileResponse("static/home.html")
 
 
 @app.get("/chat")
 async def chat():
-    """Chat page"""
     return FileResponse("static/chat.html")
 
 
-# File processing function
+# File processing
 def process_file(file_content: bytes, filename: str) -> str:
     """Process uploaded file and return text content"""
     file_ext = filename.lower().split('.')[-1]
@@ -637,14 +547,15 @@ async def health_check():
     return {
         "status": "healthy",
         "sessions_count": len(bot.store),
-        "version": "2.0.0"
+        "version": "3.0.0",
+        "supported_format": "compressed_matrix"
     }
 
 
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 Starting SDRF-GPT service...")
+    print("🚀 Starting SDRF-GPT service (Simplified Version)...")
     print("📝 System prompt loaded")
-    print("🔧 Compressed format JSON parsing supported")
+    print("🔧 Supports compressed_matrix format only")
     print("✅ Service ready: http://127.0.0.1:8000")
     uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -20,11 +20,12 @@ import json
 import pandas as pd
 import PyPDF2
 from io import BytesIO, StringIO
-import re
+import re,os
 import asyncio
 from typing import List, Dict, Any, Optional
-
-load_dotenv()
+from dotenv import load_dotenv, find_dotenv
+env_path = find_dotenv()
+load_dotenv(dotenv_path=env_path, override=True, verbose=True)
 
 app = FastAPI(title="SDRF-GPT API")
 
@@ -215,7 +216,7 @@ class SDRFJsonParser:
 class Chatbot:
     def __init__(self):
         self.model = init_chat_model(
-            "gemini-2.5-pro",
+            "gemini-2.5-flash",
             model_provider="google_genai",
             temperature=0,
             timeout=60,

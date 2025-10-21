@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDRF-GPT Chat Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            height: 90vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.3);
+            display: flex;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 250px;
+            background: #f8f9fa;
+            border-right: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            background: #667eea;
+            color: white;
+        }
+
+        .sidebar-header h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .new-chat-btn {
+            width: 100%;
+            padding: 10px;
+            background: white;
+            color: #667eea;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .new-chat-btn:hover {
+            background: #f0f0f0;
+        }
+
+        .sessions-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .session-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .session-item:hover {
+            background: #e9ecef;
+        }
+
+        .session-item.active {
+            border-color: #667eea;
+            background: #f0f3ff;
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            padding: 20px;
+            background: #667eea;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header h1 {
+            font-size: 24px;
+        }
+
+        .header-buttons button {
+            padding: 8px 15px;
+            margin-left: 10px;
+            background: white;
+            color: #667eea;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 15px 20px;
+            border-radius: 18px;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: #667eea;
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+
+        .message.assistant .message-content {
+            background: white;
+            color: #333;
+            border-bottom-left-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .sdrf-table-container {
+            margin-top: 15px;
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            max-width: 100%;
+            overflow-x: auto;
+        }
+
+        .sdrf-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .sdrf-table th {
+            background: #667eea;
+            color: white;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+        }
+
+        .sdrf-table td {
+            padding: 8px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .sdrf-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .table-controls {
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pagination {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .pagination button {
+            padding: 5px 12px;
+            border: 1px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .pagination button.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .download-btn {
+            padding: 8px 15px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .download-btn:hover {
+            background: #218838;
+        }
+
+        .input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .file-upload-area {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 2px dashed #667eea;
+        }
+
+        .file-list {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 10px;
+        }
+
+        #userInput {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        #userInput:focus {
+            border-color: #667eea;
+        }
+
+        .send-btn {
+            width: 120px;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .send-btn:hover {
+            background: #5568d3;
+        }
+
+        .send-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .data-stats {
+            background: #e7f3ff;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 13px;
+            color: #0066cc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>💬 Chat History</h2>
+                <button class="new-chat-btn" onclick="newChat()">+ New Chat</button>
+            </div>
+            <div class="sessions-list" id="sessionsList"></div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-container">
+            <div class="chat-header">
+                <h1>🧬 SDRF-GPT Assistant</h1>
+                <div class="header-buttons">
+                    <button onclick="clearChat()">Clear Chat</button>
+                    <button onclick="window.location.href='/home'">Back to Home</button>
+                </div>
+            </div>
+
+            <div class="messages" id="messages"></div>
+
+            <div class="input-area">
+                <div class="file-upload-area">
+                    <label for="fileInput" style="cursor: pointer; color: #667eea; font-weight: bold;">
+                        📁 Click to Upload Files (PDF, CSV, Excel, TXT)
+                    </label>
+                    <input type="file" id="fileInput" multiple
+                           accept=".pdf,.csv,.txt,.xlsx,.xls,.tsv"
+                           style="display: none;"
+                           onchange="handleFileUpload()">
+                    <div class="file-list" id="fileList"></div>
+                </div>
+
+                <div class="input-wrapper">
+                    <input type="text"
+                           id="userInput"
+                           placeholder="Type your message..."
+                           onkeypress="handleKeyPress(event)">
+                    <button class="send-btn" onclick="sendMessage()" id="sendBtn">
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSessionId = 'session_' + Date.now();
+        let uploadedFiles = [];
+        let allSessions = [];
+
+        // Initialize
+        async function init() {
+            loadSessions();
+            addMessage('assistant', '👋 Hello! I am SDRF-GPT Assistant.\n\nPlease tell me what organism the experimental samples are from. I will select the appropriate SDRF template based on the organism type.');
+        }
+
+        // Load session list
+        async function loadSessions() {
+            try {
+                const response = await fetch('/sessions');
+                const data = await response.json();
+                allSessions = data.sessions;
+                renderSessions();
+            } catch (error) {
+                console.error('Failed to load sessions:', error);
+            }
+        }
+
+        // Render session list
+        function renderSessions() {
+            const list = document.getElementById('sessionsList');
+            list.innerHTML = allSessions.map(session => `
+                <div class="session-item ${session.id === currentSessionId ? 'active' : ''}"
+                     onclick="switchSession('${session.id}')">
+                    ${session.title}
+                </div>
+            `).join('');
+        }
+
+        // Switch session
+        async function switchSession(sessionId) {
+            currentSessionId = sessionId;
+            renderSessions();
+            await loadSessionHistory(sessionId);
+        }
+
+        // Load session history
+        async function loadSessionHistory(sessionId) {
+            try {
+                const response = await fetch(`/sessions/${sessionId}/history`);
+                const data = await response.json();
+
+                const messagesDiv = document.getElementById('messages');
+                messagesDiv.innerHTML = '';
+
+                data.history.forEach(msg => {
+                    addMessage(msg.role, msg.content, false);
+                });
+            } catch (error) {
+                console.error('Failed to load history:', error);
+            }
+        }
+
+        // New chat
+        function newChat() {
+            currentSessionId = 'session_' + Date.now();
+            document.getElementById('messages').innerHTML = '';
+            uploadedFiles = [];
+            document.getElementById('fileList').innerHTML = '';
+            loadSessions();
+            addMessage('assistant', '👋 New chat started! Please tell me what organism the experimental samples are from.');
+        }
+
+        // Clear chat
+        async function clearChat() {
+            if (confirm('Are you sure you want to clear the current chat?')) {
+                try {
+                    await fetch('/sessions/clear', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({session_id: currentSessionId})
+                    });
+                    document.getElementById('messages').innerHTML = '';
+                    addMessage('assistant', 'Chat cleared. Please start again.');
+                } catch (error) {
+                    console.error('Failed to clear:', error);
+                }
+            }
+        }
+
+        // Handle file upload
+        async function handleFileUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const files = Array.from(fileInput.files);
+
+            if (files.length === 0) return;
+
+            const formData = new FormData();
+            files.forEach(file => formData.append('files', file));
+
+            try {
+                const fileListDiv = document.getElementById('fileList');
+                fileListDiv.innerHTML = '⏳ Processing files...';
+
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    uploadedFiles.push(data.content);
+                    fileListDiv.innerHTML = `✅ Uploaded ${data.file_count} file(s): ${data.filenames.join(', ')}`;
+                } else {
+                    fileListDiv.innerHTML = '❌ File upload failed';
+                }
+            } catch (error) {
+                console.error('File upload error:', error);
+                document.getElementById('fileList').innerHTML = '❌ File processing failed';
+            }
+        }
+
+        // Send message
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            let message = input.value.trim();
+
+            if (!message && uploadedFiles.length === 0) return;
+
+            // Merge uploaded file content
+            if (uploadedFiles.length > 0) {
+                message = uploadedFiles.join('\n\n') + (message ? '\n\n' + message : '');
+                uploadedFiles = [];
+                document.getElementById('fileList').innerHTML = '';
+            }
+
+            input.value = '';
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<div class="loading"></div>';
+
+            addMessage('user', message);
+
+            try {
+                const response = await fetch('/chat/stream', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        message: message,
+                        session_id: currentSessionId
+                    })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let currentMessage = '';
+                let sdrfData = null;  // Store SDRF data
+
+                while (true) {
+                    const {value, done} = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, {stream: true});
+                    const lines = buffer.split('\n\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') continue;
+
+                            try {
+                                const parsed = JSON.parse(data);
+
+                                if (parsed.type === 'text') {
+                                    currentMessage += parsed.content;
+                                    updateLastMessage(currentMessage);
+                                } else if (parsed.type === 'sdrf_json') {
+                                    // Save SDRF data, display after stream ends
+                                    sdrfData = parsed.data;
+                                    console.log('✅ Received SDRF data:', sdrfData.length, 'rows');
+                                }
+                            } catch (e) {
+                                console.error('Parse error:', e);
+                            }
+                        }
+                    }
+                }
+
+                // Ensure assistant message container exists
+                if (!currentMessage && !sdrfData) {
+                    addMessage('assistant', '');
+                }
+
+                // After stream ends, display SDRF table
+                if (sdrfData && sdrfData.length > 0) {
+                    console.log('📊 Starting to display SDRF table...');
+                    // Wait for DOM update
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    displaySDRFTable(sdrfData);
+                }
+
+            } catch (error) {
+                console.error('Send failed:', error);
+                addMessage('assistant', '❌ Send failed, please retry');
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send';
+                loadSessions();
+            }
+        }
+
+        // Add message
+        function addMessage(role, content, scroll = true) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = formatMessage(content);
+
+            messageDiv.appendChild(contentDiv);
+            messagesDiv.appendChild(messageDiv);
+
+            if (scroll) {
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }
+        }
+
+        // Update last message
+        function updateLastMessage(content) {
+            const messagesDiv = document.getElementById('messages');
+            let lastMessage = messagesDiv.lastElementChild;
+
+            if (!lastMessage || !lastMessage.classList.contains('assistant')) {
+                addMessage('assistant', content);
+            } else {
+                const contentDiv = lastMessage.querySelector('.message-content');
+                contentDiv.innerHTML = formatMessage(content);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }
+        }
+
+        // Format message
+        function formatMessage(text) {
+            return text
+                .replace(/\n/g, '<br>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/`(.*?)`/g, '<code>$1</code>');
+        }
+
+        // Display SDRF table (with pagination)
+        function displaySDRFTable(data) {
+            console.log('📊 displaySDRFTable called, data rows:', data.length);
+
+            if (!data || data.length === 0) {
+                console.warn('❌ Data is empty');
+                return;
+            }
+
+            const container = document.createElement('div');
+            container.className = 'sdrf-table-container';
+
+            // Data statistics
+            const stats = document.createElement('div');
+            stats.className = 'data-stats';
+            stats.innerHTML = `📊 Data Statistics: ${data.length} rows × ${Object.keys(data[0]).length} columns`;
+            container.appendChild(stats);
+
+            const pageSize = 50;
+            let currentPage = 0;
+            const totalPages = Math.ceil(data.length / pageSize);
+
+            function renderPage() {
+                const start = currentPage * pageSize;
+                const end = Math.min(start + pageSize, data.length);
+                const pageData = data.slice(start, end);
+
+                let tableHTML = '<table class="sdrf-table"><thead><tr>';
+                Object.keys(data[0]).forEach(key => {
+                    tableHTML += `<th>${key}</th>`;
+                });
+                tableHTML += '</tr></thead><tbody>';
+
+                pageData.forEach(row => {
+                    tableHTML += '<tr>';
+                    Object.values(row).forEach(value => {
+                        tableHTML += `<td>${value}</td>`;
+                    });
+                    tableHTML += '</tr>';
+                });
+                tableHTML += '</tbody></table>';
+
+                const tableDiv = container.querySelector('.table-wrapper') || document.createElement('div');
+                tableDiv.className = 'table-wrapper';
+                tableDiv.innerHTML = tableHTML;
+
+                if (!container.querySelector('.table-wrapper')) {
+                    container.appendChild(tableDiv);
+                }
+
+                // Update pagination controls
+                updatePagination();
+            }
+
+            function updatePagination() {
+                let controlsHTML = `
+                    <div class="table-controls">
+                        <div class="pagination">
+                            <button onclick="sdrf_prevPage()" ${currentPage === 0 ? 'disabled' : ''}>Previous</button>
+                            <span>Page ${currentPage + 1} / ${totalPages} (showing ${currentPage * pageSize + 1}-${Math.min((currentPage + 1) * pageSize, data.length)} / ${data.length})</span>
+                            <button onclick="sdrf_nextPage()" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Next</button>
+                        </div>
+                        <button class="download-btn" onclick="downloadSDRF()">📥 Download TSV</button>
+                    </div>
+                `;
+
+                const controlsDiv = container.querySelector('.table-controls-wrapper') || document.createElement('div');
+                controlsDiv.className = 'table-controls-wrapper';
+                controlsDiv.innerHTML = controlsHTML;
+
+                if (!container.querySelector('.table-controls-wrapper')) {
+                    container.appendChild(controlsDiv);
+                }
+            }
+
+            // Global functions for pagination
+            window.currentSDRFData = data;
+            window.sdrf_prevPage = function() {
+                if (currentPage > 0) {
+                    currentPage--;
+                    renderPage();
+                }
+            };
+            window.sdrf_nextPage = function() {
+                if (currentPage < totalPages - 1) {
+                    currentPage++;
+                    renderPage();
+                }
+            };
+
+            renderPage();
+
+            // Find last assistant message
+            const messagesDiv = document.getElementById('messages');
+            const assistantMessages = messagesDiv.querySelectorAll('.message.assistant');
+            const lastMessage = assistantMessages[assistantMessages.length - 1];
+
+            if (lastMessage) {
+                const contentDiv = lastMessage.querySelector('.message-content');
+                if (contentDiv) {
+                    console.log('✅ Found message container, adding table');
+                    contentDiv.appendChild(container);
+                    // Scroll to bottom
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                } else {
+                    console.error('❌ Cannot find message-content');
+                }
+            } else {
+                console.error('❌ Cannot find assistant message');
+            }
+        }
+
+        // Download SDRF as TSV
+        function downloadSDRF() {
+            const data = window.currentSDRFData;
+            if (!data || data.length === 0) return;
+
+            let tsv = Object.keys(data[0]).join('\t') + '\n';
+            data.forEach(row => {
+                tsv += Object.values(row).join('\t') + '\n';
+            });
+
+            const blob = new Blob([tsv], {type: 'text/tab-separated-values'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sdrf_${Date.now()}.tsv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Send on Enter key press
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        // Initialize on page load
+        window.onload = init;
+    </script>
+</body>
+</html>

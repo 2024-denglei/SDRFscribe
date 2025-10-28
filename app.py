@@ -26,6 +26,7 @@ from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv, find_dotenv
 env_path = find_dotenv()
 load_dotenv(dotenv_path=env_path, override=True, verbose=True)
+print(os.getenv("GOOGLE_API_KEY"))
 
 app = FastAPI(title="SDRF-GPT API")
 
@@ -219,7 +220,7 @@ class Chatbot:
             "gemini-2.5-flash",
             model_provider="google_genai",
             temperature=0,
-            timeout=60,
+            timeout=240,
         )
 
         with open('system_prompt.txt', 'r', encoding='utf-8') as f:
@@ -229,7 +230,7 @@ class Chatbot:
             self.sdrf_proteomic = f.read().strip()
 
         self.prompt_template = ChatPromptTemplate.from_messages([
-            ('system', '{sdrf_proteomic}\n\n{system_prompt}'),
+            ('system', '{system_prompt}'),
             MessagesPlaceholder(variable_name='history'),
             ('user', '{input}')
         ])

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SDRF-GPT Chat Assistant</title>
+    <title>Simple Chat Assistant</title>
     <style>
         * {
             margin: 0;
@@ -154,6 +154,7 @@
             padding: 15px 20px;
             border-radius: 18px;
             word-wrap: break-word;
+            white-space: pre-wrap;
         }
 
         .message.user .message-content {
@@ -169,354 +170,377 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
-        .sdrf-table-container {
-            margin-top: 15px;
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-            max-width: 100%;
-            border: 1px solid #e0e0e0;
-        }
-
-        .data-stats {
-            background: linear-gradient(135deg, #e7f3ff 0%, #f0e7ff 100%);
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .stats-info {
-            font-size: 13px;
-            color: #0066cc;
-            font-weight: 500;
-        }
-
-        .stats-badge {
-            display: inline-block;
-            padding: 4px 10px;
-            background: white;
-            border-radius: 12px;
-            margin-right: 8px;
-            font-weight: bold;
-        }
-
-        .table-wrapper {
-            overflow: auto;
-            max-height: 500px;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            background: white;
-        }
-
-        .sdrf-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-        }
-
-        .sdrf-table th {
-            background: #667eea;
-            color: white;
-            padding: 12px 8px;
-            text-align: left;
-            font-weight: bold;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            white-space: nowrap;
-            border-right: 1px solid rgba(255,255,255,0.2);
-        }
-
-        .sdrf-table th:last-child {
-            border-right: none;
-        }
-
-        .sdrf-table td {
-            padding: 10px 8px;
-            border-bottom: 1px solid #e0e0e0;
-            border-right: 1px solid #f0f0f0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 250px;
-        }
-
-        .sdrf-table td:last-child {
-            border-right: none;
-        }
-
-        .sdrf-table tr:hover {
-            background: #f8f9fa;
-        }
-
-        .sdrf-table tr:nth-child(even) {
-            background: #fafbfc;
-        }
-
-        .sdrf-table tr:nth-child(even):hover {
-            background: #f0f2f5;
-        }
-
-        .table-controls {
-            margin-top: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-
-        .pagination {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .pagination button {
-            padding: 6px 14px;
-            border: 2px solid #667eea;
-            background: white;
-            color: #667eea;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-
-        .pagination button:hover:not(:disabled) {
-            background: #667eea;
-            color: white;
-        }
-
-        .pagination button:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-            border-color: #ccc;
-            color: #999;
-        }
-
-        .pagination-info {
-            padding: 6px 12px;
-            background: white;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 500;
-            color: #666;
-        }
-
-        .download-btn {
-            padding: 8px 16px;
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .download-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
-        }
-
-        .page-size-selector {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .page-size-selector select {
-            padding: 6px 10px;
-            border: 2px solid #667eea;
-            border-radius: 6px;
-            font-size: 13px;
-            cursor: pointer;
-            background: white;
-        }
-
-        .input-area {
-            padding: 20px;
+        /* Modern Input Container */
+        .input-container {
+            padding: 20px 30px 30px;
             background: white;
             border-top: 1px solid #e0e0e0;
         }
 
-        .file-upload-area {
-            margin-bottom: 15px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            border: 2px dashed #667eea;
-        }
-
-        .file-list {
-            margin-top: 10px;
-            font-size: 13px;
-            color: #666;
-        }
-
         .input-wrapper {
+            position: relative;
             display: flex;
+            align-items: center;
             gap: 10px;
-        }
-
-        #userInput {
-            flex: 1;
-            padding: 15px;
+            background: #f8f9fa;
             border: 2px solid #e0e0e0;
-            border-radius: 25px;
-            font-size: 14px;
-            outline: none;
+            border-radius: 30px;
+            padding: 8px 12px;
             transition: all 0.3s;
         }
 
-        #userInput:focus {
+        .input-wrapper:focus-within {
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Left Action Buttons */
+        .left-actions {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .action-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            color: #666;
+            font-size: 18px;
+        }
+
+        .action-btn:hover {
+            background: #e9ecef;
+            color: #667eea;
+        }
+
+        .action-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Main Input */
+        .main-input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            font-size: 16px;
+            outline: none;
+            padding: 8px 12px;
+            font-family: inherit;
+            resize: none;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .main-input::placeholder {
+            color: #999;
+        }
+
+        /* Right Actions */
+        .right-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .model-selector {
+            padding: 6px 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 20px;
+            background: white;
+            font-size: 13px;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.2s;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 14px;
+            padding-right: 30px;
+        }
+
+        .model-selector:hover {
             border-color: #667eea;
         }
 
+        /* Send Button */
         .send-btn {
-            width: 120px;
-            padding: 15px;
+            width: 40px;
+            height: 40px;
+            border: none;
             background: #667eea;
             color: white;
-            border: none;
-            border-radius: 25px;
+            border-radius: 50%;
             cursor: pointer;
-            font-weight: bold;
-            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             transition: all 0.3s;
+            font-size: 20px;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
         }
 
-        .send-btn:hover {
-            background: #5568d3;
+        .send-btn:hover:not(:disabled) {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .send-btn:active:not(:disabled) {
+            transform: translateY(0);
         }
 
         .send-btn:disabled {
             background: #ccc;
             cursor: not-allowed;
+            box-shadow: none;
         }
 
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
+        /* File Input Hidden */
+        input[type="file"] {
+            display: none;
+        }
+
+        /* File Upload Status */
+        .upload-status {
+            margin-top: 10px;
+            padding: 10px 15px;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 12px;
+            font-size: 13px;
+            color: #155724;
+            display: none;
+        }
+
+        .upload-status.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .upload-status.error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e0e0e0;
+            border-top-color: #667eea;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
-        .scroll-hint {
-            font-size: 11px;
-            color: #999;
-            margin-top: 5px;
-            font-style: italic;
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .container {
+                width: 100%;
+                height: 100vh;
+                border-radius: 0;
+            }
+
+            .sidebar {
+                width: 200px;
+            }
+
+            .chat-header h1 {
+                font-size: 20px;
+            }
+
+            .message-content {
+                max-width: 85%;
+            }
+
+            .model-selector {
+                display: none;
+            }
+
+            .input-container {
+                padding: 15px 15px 20px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Sidebar -->
         <div class="sidebar">
             <div class="sidebar-header">
-                <h2>💬 Chat History</h2>
-                <button class="new-chat-btn" onclick="newChat()">+ New Chat</button>
+                <h2>💬 Chat Sessions</h2>
+                <button class="new-chat-btn" onclick="createNewSession()">➕ New Chat</button>
             </div>
-            <div class="sessions-list" id="sessionsList"></div>
+            <div class="sessions-list" id="sessionsList">
+                <!-- Sessions will be loaded here -->
+            </div>
         </div>
 
-        <!-- Chat Area -->
         <div class="chat-container">
             <div class="chat-header">
-                <h1>🧬 SDRF-GPT Assistant</h1>
+                <h1>🤖 Simple Chat Assistant</h1>
                 <div class="header-buttons">
-                    <button onclick="clearChat()">Clear Chat</button>
-                    <button onclick="window.location.href='/home'">Back to Home</button>
+                    <button onclick="clearCurrentSession()">🗑️ Clear</button>
+                    <button onclick="goHome()">🏠 Home</button>
                 </div>
             </div>
 
-            <div class="messages" id="messages"></div>
+            <div class="messages" id="messages">
+                <!-- Messages will be loaded here dynamically -->
+            </div>
 
-            <div class="input-area">
-                <div class="file-upload-area">
-                    <label for="fileInput" style="cursor: pointer; color: #667eea; font-weight: bold;">
-                        📁 Click to Upload Files (PDF, CSV, Excel, TXT)
-                    </label>
-                    <input type="file" id="fileInput" multiple
-                           accept=".pdf,.csv,.txt,.xlsx,.xls,.tsv"
-                           style="display: none;"
-                           onchange="handleFileUpload()">
-                    <div class="file-list" id="fileList"></div>
-                </div>
-
+            <div class="input-container">
                 <div class="input-wrapper">
-                    <input type="text"
-                           id="userInput"
-                           placeholder="Type your message..."
-                           onkeypress="handleKeyPress(event)">
-                    <button class="send-btn" onclick="sendMessage()" id="sendBtn">
-                        Send
-                    </button>
+                    <!-- Left Action Button - Only Upload -->
+                    <div class="left-actions">
+                        <button class="action-btn" onclick="document.getElementById('fileInput').click()" title="Upload files">
+                            ➕
+                        </button>
+                    </div>
+
+                    <!-- Main Input -->
+                    <textarea
+                        class="main-input"
+                        id="messageInput"
+                        placeholder="How can I help you today?"
+                        rows="1"
+                        onkeydown="handleKeyDown(event)"
+                        oninput="autoResize(this)"
+                    ></textarea>
+
+                    <!-- Right Actions -->
+                    <div class="right-actions">
+                        <select class="model-selector" id="modelSelector">
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                        </select>
+
+                        <button class="send-btn" onclick="sendMessage()" id="sendBtn" title="Send message">
+                            ↑
+                        </button>
+                    </div>
                 </div>
+
+                <!-- Upload Status -->
+                <div class="upload-status" id="uploadStatus"></div>
+
+                <!-- Hidden File Input -->
+                <input type="file" id="fileInput" multiple accept=".txt,.pdf,.csv,.xlsx,.xls,.tsv" onchange="handleFileUpload()" />
             </div>
         </div>
     </div>
 
     <script>
-        let currentSessionId = 'session_' + Date.now();
-        let uploadedFiles = [];
-        let allSessions = [];
+        let currentSessionId = 'default';
+        let isUploading = false;
 
         // Initialize
-        async function init() {
+        function init() {
             loadSessions();
-            addMessage('assistant', '👋 Hello! I am SDRF-GPT Assistant. Please upload the manuscript PDF');
+            loadSessionHistory(currentSessionId);
         }
 
-        // Load session list
+        // Auto-resize textarea
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+        }
+
+        // Handle keyboard shortcuts
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // Create new session
+        function createNewSession() {
+            const sessionId = 'session_' + Date.now();
+            currentSessionId = sessionId;
+            clearMessages();
+            addMessage('assistant', '👋 Hello! I\'m your chat assistant. How can I help you today?');
+            loadSessions();
+        }
+
+        // Go to home page
+        function goHome() {
+            window.location.href = '/home';
+        }
+
+        // Clear current session
+        async function clearCurrentSession() {
+            if (confirm('Are you sure you want to clear this session?')) {
+                try {
+                    const response = await fetch('/sessions/clear', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_id: currentSessionId })
+                    });
+
+                    if (response.ok) {
+                        clearMessages();
+                        addMessage('assistant', '👋 Hello! I\'m your chat assistant. How can I help you today?');
+                    }
+                } catch (error) {
+                    console.error('Clear session failed:', error);
+                }
+            }
+        }
+
+        // Load sessions
         async function loadSessions() {
             try {
                 const response = await fetch('/sessions');
                 const data = await response.json();
-                allSessions = data.sessions;
-                renderSessions();
-            } catch (error) {
-                console.error('Failed to load sessions:', error);
-            }
-        }
 
-        // Render session list
-        function renderSessions() {
-            const list = document.getElementById('sessionsList');
-            list.innerHTML = allSessions.map(session => `
-                <div class="session-item ${session.id === currentSessionId ? 'active' : ''}"
-                     onclick="switchSession('${session.id}')">
-                    ${session.title}
-                </div>
-            `).join('');
+                const sessionsList = document.getElementById('sessionsList');
+                sessionsList.innerHTML = '';
+
+                data.sessions.forEach(session => {
+                    const sessionDiv = document.createElement('div');
+                    sessionDiv.className = `session-item ${session.id === currentSessionId ? 'active' : ''}`;
+                    sessionDiv.textContent = session.title;
+                    sessionDiv.onclick = () => switchSession(session.id);
+                    sessionsList.appendChild(sessionDiv);
+                });
+            } catch (error) {
+                console.error('Load sessions failed:', error);
+            }
         }
 
         // Switch session
         async function switchSession(sessionId) {
             currentSessionId = sessionId;
-            renderSessions();
+            clearMessages();
             await loadSessionHistory(sessionId);
+            loadSessions();
         }
 
         // Load session history
@@ -525,152 +549,146 @@
                 const response = await fetch(`/sessions/${sessionId}/history`);
                 const data = await response.json();
 
-                const messagesDiv = document.getElementById('messages');
-                messagesDiv.innerHTML = '';
-
-                data.history.forEach(msg => {
-                    addMessage(msg.role, msg.content, false);
-                });
-            } catch (error) {
-                console.error('Failed to load history:', error);
-            }
-        }
-
-        // New chat
-        function newChat() {
-            currentSessionId = 'session_' + Date.now();
-            document.getElementById('messages').innerHTML = '';
-            uploadedFiles = [];
-            document.getElementById('fileList').innerHTML = '';
-            loadSessions();
-            addMessage('assistant', '👋 New chat started! Please tell me what organism the experimental samples are from.');
-        }
-
-        // Clear chat
-        async function clearChat() {
-            if (confirm('Are you sure you want to clear the current chat?')) {
-                try {
-                    await fetch('/sessions/clear', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({session_id: currentSessionId})
+                if (data.history.length === 0) {
+                    // Only add welcome message if history is empty
+                    addMessage('assistant', '👋 Hello! I\'m your chat assistant. How can I help you today?');
+                } else {
+                    // Load existing messages from history
+                    data.history.forEach(msg => {
+                        addMessage(msg.role, msg.content, false);
                     });
-                    document.getElementById('messages').innerHTML = '';
-                    addMessage('assistant', 'Chat cleared. Please start again.');
-                } catch (error) {
-                    console.error('Failed to clear:', error);
+
+                    const messagesDiv = document.getElementById('messages');
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
                 }
+            } catch (error) {
+                console.error('Load history failed:', error);
             }
+        }
+
+        // Clear messages
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+        }
+
+        // Show upload status
+        function showUploadStatus(message, isError = false) {
+            const status = document.getElementById('uploadStatus');
+            status.textContent = message;
+            status.className = 'upload-status show' + (isError ? ' error' : '');
+
+            setTimeout(() => {
+                status.classList.remove('show');
+            }, 3000);
         }
 
         // Handle file upload
         async function handleFileUpload() {
             const fileInput = document.getElementById('fileInput');
-            const files = Array.from(fileInput.files);
+            const files = fileInput.files;
 
             if (files.length === 0) return;
 
-            const formData = new FormData();
-            files.forEach(file => formData.append('files', file));
+            isUploading = true;
+            showUploadStatus('📤 Uploading files...');
 
             try {
-                const fileListDiv = document.getElementById('fileList');
-                fileListDiv.innerHTML = '⏳ Processing files...';
+                const formData = new FormData();
+                for (let file of files) {
+                    formData.append('files', file);
+                }
 
                 const response = await fetch('/upload', {
                     method: 'POST',
                     body: formData
                 });
 
-                const data = await response.json();
+                const result = await response.json();
 
-                if (data.status === 'success') {
-                    uploadedFiles.push(data.content);
-                    fileListDiv.innerHTML = `✅ Uploaded ${data.file_count} file(s): ${data.filenames.join(', ')}`;
+                if (result.status === 'success') {
+                    showUploadStatus(`✅ Uploaded ${result.file_count} file(s): ${result.filenames.join(', ')}`);
+
+                    // Auto-fill input with file content
+                    const messageInput = document.getElementById('messageInput');
+                    messageInput.value = `Please analyze the uploaded file(s):\n\n${result.content}`;
+                    autoResize(messageInput);
+
+                    fileInput.value = '';
                 } else {
-                    fileListDiv.innerHTML = '❌ File upload failed';
+                    showUploadStatus('❌ Upload failed', true);
                 }
             } catch (error) {
-                console.error('File upload error:', error);
-                document.getElementById('fileList').innerHTML = '❌ File processing failed';
+                console.error('Upload failed:', error);
+                showUploadStatus(`❌ Upload failed: ${error.message}`, true);
+            } finally {
+                isUploading = false;
             }
         }
 
         // Send message
         async function sendMessage() {
-            const input = document.getElementById('userInput');
-            let message = input.value.trim();
-
-            if (!message && uploadedFiles.length === 0) return;
-
-            // Merge uploaded file content
-            if (uploadedFiles.length > 0) {
-                message = uploadedFiles.join('\n\n') + (message ? '\n\n' + message : '');
-                uploadedFiles = [];
-                document.getElementById('fileList').innerHTML = '';
-            }
-
-            input.value = '';
+            const messageInput = document.getElementById('messageInput');
             const sendBtn = document.getElementById('sendBtn');
-            sendBtn.disabled = true;
-            sendBtn.innerHTML = '<div class="loading"></div>';
+            const modelSelector = document.getElementById('modelSelector');
+            const message = messageInput.value.trim();
 
+            if (!message || isUploading) return;
+
+            // Disable send button
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<div class="spinner"></div>';
+
+            // Add user message
             addMessage('user', message);
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
 
             try {
+                // Send request
                 const response = await fetch('/chat/stream', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         message: message,
-                        session_id: currentSessionId
+                        session_id: currentSessionId,
+                        model: modelSelector.value
                     })
                 });
 
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                // Handle streaming response
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
-                let buffer = '';
-                let currentMessage = '';
-                let sdrfData = null;
+                let accumulatedContent = '';
 
                 while (true) {
-                    const {value, done} = await reader.read();
+                    const { done, value } = await reader.read();
                     if (done) break;
 
-                    buffer += decoder.decode(value, {stream: true});
-                    const lines = buffer.split('\n\n');
-                    buffer = lines.pop();
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
 
                     for (const line of lines) {
                         if (line.startsWith('data: ')) {
                             const data = line.slice(6);
-                            if (data === '[DONE]') continue;
+                            if (data === '[DONE]') {
+                                break;
+                            }
 
                             try {
                                 const parsed = JSON.parse(data);
-
-                                if (parsed.type === 'text') {
-                                    currentMessage += parsed.content;
-                                    updateLastMessage(currentMessage);
-                                } else if (parsed.type === 'sdrf_json') {
-                                    sdrfData = parsed.data;
-                                    console.log('✅ Received SDRF data:', sdrfData.length, 'rows');
+                                if (parsed.type === 'text' && parsed.content) {
+                                    accumulatedContent += parsed.content;
+                                    updateLastMessage(accumulatedContent);
                                 }
                             } catch (e) {
-                                console.error('Parse error:', e);
+                                // Ignore parsing errors for streaming data
                             }
                         }
                     }
-                }
-
-                if (!currentMessage && !sdrfData) {
-                    addMessage('assistant', '');
-                }
-
-                if (sdrfData && sdrfData.length > 0) {
-                    console.log('📊 Displaying SDRF table...');
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    displaySDRFTable(sdrfData);
                 }
 
             } catch (error) {
@@ -678,7 +696,7 @@
                 addMessage('assistant', '❌ Send failed, please retry');
             } finally {
                 sendBtn.disabled = false;
-                sendBtn.textContent = 'Send';
+                sendBtn.textContent = '↑';
                 loadSessions();
             }
         }
@@ -691,7 +709,7 @@
 
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
-            contentDiv.innerHTML = formatMessage(content);
+            contentDiv.textContent = content;
 
             messageDiv.appendChild(contentDiv);
             messagesDiv.appendChild(messageDiv);
@@ -710,197 +728,8 @@
                 addMessage('assistant', content);
             } else {
                 const contentDiv = lastMessage.querySelector('.message-content');
-                contentDiv.innerHTML = formatMessage(content);
+                contentDiv.textContent = content;
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            }
-        }
-
-        // Format message
-        function formatMessage(text) {
-            return text
-                .replace(/\n/g, '<br>')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/`(.*?)`/g, '<code>$1</code>');
-        }
-
-        // Display SDRF table with enhanced features
-        function displaySDRFTable(data) {
-            console.log('📊 displaySDRFTable called, data rows:', data.length);
-
-            if (!data || data.length === 0) {
-                console.warn('❌ Data is empty');
-                return;
-            }
-
-            const container = document.createElement('div');
-            container.className = 'sdrf-table-container';
-
-            // Calculate statistics
-            const columnCount = Object.keys(data[0]).length;
-            const rowCount = data.length;
-
-            // Data statistics with badges
-            const stats = document.createElement('div');
-            stats.className = 'data-stats';
-            stats.innerHTML = `
-                <div class="stats-info">
-                    <span class="stats-badge">📊 ${rowCount}</span> rows
-                    <span class="stats-badge">📋 ${columnCount}</span> columns
-                </div>
-                <div class="scroll-hint">💡 Scroll horizontally and vertically to view all data</div>
-            `;
-            container.appendChild(stats);
-
-            // Table settings
-            let pageSize = 20;
-            let currentPage = 0;
-            const totalPages = Math.ceil(data.length / pageSize);
-
-            // Create table wrapper
-            const tableDiv = document.createElement('div');
-            tableDiv.className = 'table-wrapper';
-            container.appendChild(tableDiv);
-
-            // Create controls
-            const controlsDiv = document.createElement('div');
-            controlsDiv.className = 'table-controls';
-            container.appendChild(controlsDiv);
-
-            function renderPage() {
-                const start = currentPage * pageSize;
-                const end = Math.min(start + pageSize, data.length);
-                const pageData = data.slice(start, end);
-
-                let tableHTML = '<table class="sdrf-table"><thead><tr>';
-                Object.keys(data[0]).forEach(key => {
-                    tableHTML += `<th title="${key}">${key}</th>`;
-                });
-                tableHTML += '</tr></thead><tbody>';
-
-                pageData.forEach((row, idx) => {
-                    tableHTML += `<tr>`;
-                    Object.values(row).forEach(value => {
-                        const displayValue = value || '';
-                        tableHTML += `<td title="${displayValue}">${displayValue}</td>`;
-                    });
-                    tableHTML += '</tr>';
-                });
-                tableHTML += '</tbody></table>';
-
-                tableDiv.innerHTML = tableHTML;
-                updateControls();
-            }
-
-            function updateControls() {
-                const start = currentPage * pageSize + 1;
-                const end = Math.min((currentPage + 1) * pageSize, data.length);
-
-                controlsDiv.innerHTML = `
-                    <div class="pagination">
-                        <button onclick="window.sdrf_firstPage()" ${currentPage === 0 ? 'disabled' : ''}>⏮️ First</button>
-                        <button onclick="window.sdrf_prevPage()" ${currentPage === 0 ? 'disabled' : ''}>⬅️ Previous</button>
-                        <span class="pagination-info">Page ${currentPage + 1} of ${totalPages} (${start}-${end} / ${data.length})</span>
-                        <button onclick="window.sdrf_nextPage()" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Next ➡️</button>
-                        <button onclick="window.sdrf_lastPage()" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Last ⏭️</button>
-                    </div>
-                    <div class="page-size-selector">
-                        <label>Rows per page:</label>
-                        <select onchange="window.sdrf_changePageSize(this.value)">
-                            <option value="10" ${pageSize === 10 ? 'selected' : ''}>10</option>
-                            <option value="20" ${pageSize === 20 ? 'selected' : ''}>20</option>
-                            <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
-                            <option value="100" ${pageSize === 100 ? 'selected' : ''}>100</option>
-                            <option value="${data.length}">All (${data.length})</option>
-                        </select>
-                    </div>
-                    <button class="download-btn" onclick="window.downloadSDRF()">
-                        <span>📥</span>
-                        <span>Download TSV</span>
-                    </button>
-                `;
-            }
-
-            // Global functions for pagination
-            window.currentSDRFData = data;
-            window.currentPageSize = pageSize;
-            window.currentPageNum = currentPage;
-
-            window.sdrf_firstPage = function() {
-                currentPage = 0;
-                renderPage();
-            };
-
-            window.sdrf_prevPage = function() {
-                if (currentPage > 0) {
-                    currentPage--;
-                    renderPage();
-                }
-            };
-
-            window.sdrf_nextPage = function() {
-                if (currentPage < totalPages - 1) {
-                    currentPage++;
-                    renderPage();
-                }
-            };
-
-            window.sdrf_lastPage = function() {
-                currentPage = totalPages - 1;
-                renderPage();
-            };
-
-            window.sdrf_changePageSize = function(newSize) {
-                pageSize = parseInt(newSize);
-                currentPage = 0;
-                renderPage();
-            };
-
-            renderPage();
-
-            // Find and append to last assistant message
-            const messagesDiv = document.getElementById('messages');
-            const assistantMessages = messagesDiv.querySelectorAll('.message.assistant');
-            const lastMessage = assistantMessages[assistantMessages.length - 1];
-
-            if (lastMessage) {
-                const contentDiv = lastMessage.querySelector('.message-content');
-                if (contentDiv) {
-                    console.log('✅ Table added successfully');
-                    contentDiv.appendChild(container);
-                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                } else {
-                    console.error('❌ Cannot find message-content');
-                }
-            } else {
-                console.error('❌ Cannot find assistant message');
-            }
-        }
-
-        // Download SDRF as TSV
-        window.downloadSDRF = function() {
-            const data = window.currentSDRFData;
-            if (!data || data.length === 0) return;
-
-            let tsv = Object.keys(data[0]).join('\t') + '\n';
-            data.forEach(row => {
-                tsv += Object.values(row).join('\t') + '\n';
-            });
-
-            const blob = new Blob([tsv], {type: 'text/tab-separated-values;charset=utf-8'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `sdrf_export_${Date.now()}.tsv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        };
-
-        // Send on Enter key press
-        function handleKeyPress(event) {
-            if (event.key === 'Enter') {
-                sendMessage();
             }
         }
 

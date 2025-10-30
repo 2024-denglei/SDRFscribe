@@ -1,7 +1,6 @@
 """
-LangChain Web Chat Assistant - Simplified Backend Service
-Supports ONLY compressed_matrix format for SDRF data
-Removed legacy format compatibility for cleaner, faster processing
+Simple Web Chat Assistant - Backend Service
+Basic chat functionality without JSON parsing
 """
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
@@ -15,20 +14,20 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.runnables import RunnableWithMessageHistory
 from langchain_core.messages import HumanMessage, AIMessage
-from langchain_core.output_parsers import JsonOutputParser
 import json
 import pandas as pd
 import PyPDF2
 from io import BytesIO, StringIO
-import re,os
+import re, os
 import asyncio
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv, find_dotenv
+
 env_path = find_dotenv()
 load_dotenv(dotenv_path=env_path, override=True, verbose=True)
 print(os.getenv("GOOGLE_API_KEY"))
 
-app = FastAPI(title="SDRF-GPT API")
+app = FastAPI(title="Simple Chat API")
 
 # Allow CORS
 app.add_middleware(
@@ -43,305 +42,75 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-class SDRFJsonParser:
-    """SDRF JSON Data Parser - Supports compressed_matrix format only"""
-
-    def __init__(self):
-        self.json_parser = JsonOutputParser()
-
-    def is_sdrf_json(self, text: str) -> bool:
-        """Determine if text contains compressed_matrix format JSON data"""
-        try:
-            json_match = re.search(r'```json\s*(.*?)\s*```', text, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(1)
-            else:
-                json_str = text.strip()
-
-            data = json.loads(json_str)
-
-            # Only check for compressed_matrix format
-            if isinstance(data, dict):
-                return self._is_compressed_matrix_format(data)
-
-            return False
-
-        except (json.JSONDecodeError, KeyError, TypeError):
-            return False
-
-    def _is_compressed_matrix_format(self, data: dict) -> bool:
-        """Check if it's compressed_matrix format"""
-        if "format_type" in data and data["format_type"] == "compressed_matrix":
-            return ("template" in data and "constant_attributes" in data and
-                    "verity_attributes" in data and "verity_attributes_matrix" in data)
-        return False
-
-    def is_json_truncated(self, text: str) -> bool:
-        """Detect if JSON data is truncated"""
-        text = text.strip()
-
-        has_json_start = bool(re.search(r'^```json', text, re.IGNORECASE))
-        if not has_json_start:
-            return False
-
-        has_json_end = bool(re.search(r'```\s*$', text))
-        if not has_json_end:
-            return True
-
-        try:
-            json_content = self.extract_partial_json(text)
-            json.loads(json_content)
-            return False
-        except json.JSONDecodeError:
-            print(f"⚠️ JSON structure incomplete, may need to continue")
-            return True
-
-    def extract_partial_json(self, text: str) -> str:
-        """Extract partial JSON content"""
-        json_match = re.search(r'```json\s*(.*?)(?:```)?$', text, re.DOTALL)
-        if json_match:
-            return json_match.group(1).strip()
-        return text.strip()
-
-    def extract_json_data(self, text: str) -> List[Dict[str, Any]]:
-        """Extract JSON data from text and expand to standard array format"""
-        try:
-            json_match = re.search(r'```json\s*(.*?)\s*```', text, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(1)
-            else:
-                json_str = text.strip()
-
-            data = json.loads(json_str)
-
-            # Only process compressed_matrix format
-            if isinstance(data, dict) and self._is_compressed_matrix_format(data):
-                return self._expand_compressed_matrix_with_template(data)
-
-            return []
-
-        except json.JSONDecodeError as e:
-            print(f"JSON parsing error: {e}")
-            return []
-        except Exception as e:
-            print(f"Data extraction error: {e}")
-            return []
-
-    def _expand_compressed_matrix_with_template(self, data: dict) -> List[Dict[str, Any]]:
-        """Expand compressed_matrix format with template
-
-        Input format:
-        {
-            "format_type": "compressed_matrix",
-            "metadata": {...},
-            "template": ["field1", "field2", ...],
-            "constant_attributes": {"field1": "value1", ...},
-            "verity_attributes": ["field3", "field4", ...],
-            "verity_attributes_matrix": [["val3", "val4", ...], ...]
-        }
-        """
-        try:
-            template = data.get("template", [])
-            constant_attrs = data.get("constant_attributes", {})
-            verity_attrs = data.get("verity_attributes", [])
-            verity_matrix = data.get("verity_attributes_matrix", [])
-            metadata = data.get("metadata", {})
-
-            print(f"📊 Expanding compressed_matrix format:")
-            print(f"   - Template fields: {len(template)}")
-            print(f"   - Constant attributes: {len(constant_attrs)}")
-            print(f"   - Verity attributes: {len(verity_attrs)}")
-            print(f"   - Data rows: {len(verity_matrix)}")
-
-            if metadata:
-                print(f"   - Metadata: {metadata}")
-
-            result = []
-
-            # Process each row in verity_attributes_matrix
-            for row_idx, verity_values in enumerate(verity_matrix):
-                # Create a new row following template order
-                row = {}
-
-                # Fill in all fields from template
-                for field_name in template:
-                    # Check if it's a constant attribute
-                    if field_name in constant_attrs:
-                        row[field_name] = constant_attrs[field_name]
-                    # Check if it's a verity attribute
-                    elif field_name in verity_attrs:
-                        verity_idx = verity_attrs.index(field_name)
-                        if verity_idx < len(verity_values):
-                            row[field_name] = verity_values[verity_idx]
-                        else:
-                            row[field_name] = ""
-                    # Field not in either, fill with default
-                    else:
-                        row[field_name] = "not available"
-
-                result.append(row)
-
-            print(f"✅ Successfully expanded: {len(result)} rows")
-
-            # Validate against metadata if available
-            if metadata and "total_rows" in metadata:
-                expected_rows = metadata["total_rows"]
-                if len(result) != expected_rows:
-                    print(f"⚠️ Warning: Expected {expected_rows} rows, got {len(result)}")
-
-            return result
-
-        except Exception as e:
-            print(f"❌ Error expanding compressed_matrix format: {e}")
-            return []
-
-    def combine_json_parts(self, parts: List[str]) -> str:
-        """Combine multiple JSON fragments"""
-        if not parts:
-            return ""
-
-        combined = ''.join(parts)
-        combined = re.sub(r',\s*,', ',', combined)
-
-        combined = combined.strip()
-        if combined.startswith('{'):
-            if combined.count('{') > combined.count('}'):
-                combined += '}'
-        elif combined.startswith('['):
-            if combined.count('[') > combined.count(']'):
-                combined += ']'
-
-        return combined
-
-
 class Chatbot:
     def __init__(self):
-        self.model = init_chat_model(
-            "gemini-2.5-flash",
+        # Load system prompt
+        try:
+            with open('system_prompt.txt', 'r', encoding='utf-8') as f:
+                self.system_prompt = f.read().strip()
+        except FileNotFoundError:
+            self.system_prompt = "You are a helpful AI assistant."
+
+        # Load additional context if available
+        try:
+            with open('SDRF_proteomics.txt', 'r', encoding='utf-8') as f:
+                self.sdrf_proteomic = f.read().strip()
+                self.system_prompt += f"\n\nAdditional Context:\n{self.sdrf_proteomic}"
+        except FileNotFoundError:
+            self.sdrf_proteomic = ""
+
+        self.prompt_template = ChatPromptTemplate.from_messages([
+            ('system', '{system_prompt}'),
+            MessagesPlaceholder(variable_name='history'),
+            ('human', '{input}'),
+        ])
+
+        self.store = {}
+        self.session_names = {}
+
+    def _get_model(self, model_name: str = "gemini-2.5-flash"):
+        """动态创建模型实例"""
+        return init_chat_model(
+            model_name,
             model_provider="google_genai",
             temperature=0,
             timeout=240,
         )
 
-        with open('system_prompt.txt', 'r', encoding='utf-8') as f:
-            self.system_prompt = f.read().strip()
-
-        with open('SDRF_proteomics.txt', 'r', encoding='utf-8') as f:
-            self.sdrf_proteomic = f.read().strip()
-
-        self.prompt_template = ChatPromptTemplate.from_messages([
-            ('system', '{system_prompt}'),
-            MessagesPlaceholder(variable_name='history'),
-            ('user', '{input}')
-        ])
-
-        chain = self.prompt_template | self.model
-        self.store = {}
-        self.session_names = {}
-        self.sdrf_parser = SDRFJsonParser()
-
-        self.chatbot = RunnableWithMessageHistory(
-            chain,
-            self._get_session_history,
-            input_messages_key='input',
-            history_messages_key='history'
-        )
-
-    def _get_session_history(self, session_id: str):
+    def _get_message_history(self, session_id: str) -> ChatMessageHistory:
         if session_id not in self.store:
             self.store[session_id] = ChatMessageHistory()
         return self.store[session_id]
 
-    async def _continue_generation(self, session_id: str) -> str:
-        """Send 'continue' request to get remaining content"""
-        config = {'configurable': {'session_id': session_id}}
-
-        response = await self.chatbot.ainvoke(
-            {
-                'input': 'Please continue outputting the remaining JSON data, maintaining the same format',
-                'sdrf_proteomic': self.sdrf_proteomic,
-                'system_prompt': self.system_prompt
-            },
-            config=config
+    async def stream_chat(self, message: str, session_id: str = "default", model_name: str = "gemini-2.5-flash"):
+        """Simplified streaming chat without JSON parsing"""
+        model = self._get_model(model_name)
+        chain = self.prompt_template | model
+        chain_with_history = RunnableWithMessageHistory(
+            chain,
+            self._get_message_history,
+            input_messages_key="input",
+            history_messages_key="history",
         )
 
-        return response.content if hasattr(response, 'content') else str(response)
-
-    async def stream_chat(self, user_input: str, session_id: str):
-        """Stream chat response with enhanced JSON parsing"""
-        await asyncio.sleep(0.5)
-        config = {'configurable': {'session_id': session_id}}
-
-        full_response = ""
-        json_parts = []
-        max_continue_attempts = 5
-        continue_count = 0
+        config = {"configurable": {"session_id": session_id}}
 
         try:
-            async for chunk in self.chatbot.astream(
-                    {
-                        'input': user_input,
-                        'sdrf_proteomic': self.sdrf_proteomic,
-                        'system_prompt': self.system_prompt
-                    },
-                    config=config
-            ):
+            accumulated_content = ""
+
+            # Stream the response
+            async for chunk in chain_with_history.astream({
+                "input": message,
+                "system_prompt": self.system_prompt
+            }, config=config):
+
                 if hasattr(chunk, 'content') and chunk.content:
-                    full_response += chunk.content
+                    accumulated_content += chunk.content
                     yield f"data: {json.dumps({'content': chunk.content, 'type': 'text'})}\n\n"
+
         except Exception as e:
-            error_msg = f"Generation error: {str(e)}"
-            yield f"data: {json.dumps({'content': error_msg, 'type': 'error'})}\n\n"
-            yield "data: [DONE]\n\n"
-            return
-
-        # Check if continuation is needed
-        while (continue_count < max_continue_attempts and
-               self.sdrf_parser.is_json_truncated(full_response)):
-
-            json_part = self.sdrf_parser.extract_partial_json(full_response)
-            if json_part:
-                json_parts.append(json_part)
-
-            yield f"data: {json.dumps({'content': '\\n\\n[🔄 Truncation detected, retrieving remaining content...]\\n\\n', 'type': 'text'})}\n\n"
-
-            continue_count += 1
-
-            try:
-                continue_response = await self._continue_generation(session_id)
-                yield f"data: {json.dumps({'content': continue_response, 'type': 'text'})}\n\n"
-                full_response = continue_response
-                await asyncio.sleep(0.5)
-
-            except Exception as e:
-                print(f"Error during continuation: {e}")
-                break
-
-        # Process JSON data
-        if json_parts or self.sdrf_parser.is_sdrf_json(full_response):
-            try:
-                if json_parts:
-                    last_part = self.sdrf_parser.extract_partial_json(full_response)
-                    if last_part and last_part not in json_parts:
-                        json_parts.append(last_part)
-                    combined_json = self.sdrf_parser.combine_json_parts(json_parts)
-                    json_data = json.loads(combined_json) if combined_json else []
-                else:
-                    json_data = self.sdrf_parser.extract_json_data(full_response)
-
-                if json_data:
-                    yield f"data: {json.dumps({'type': 'sdrf_json', 'data': json_data})}\n\n"
-
-                    if continue_count > 0:
-                        success_msg = f"\\n✅ Successfully merged {continue_count + 1} fragments"
-                        yield f"data: {json.dumps({'content': success_msg, 'type': 'text'})}\n\n"
-
-                    stats_msg = f"\\n📊 Generated {len(json_data)} rows of SDRF data"
-                    yield f"data: {json.dumps({'content': stats_msg, 'type': 'text'})}\n\n"
-
-            except Exception as e:
-                error_msg = f"\\n❌ JSON data processing failed: {str(e)}"
-                yield f"data: {json.dumps({'content': error_msg, 'type': 'text'})}\n\n"
+            error_msg = f"❌ Error occurred: {str(e)}"
+            yield f"data: {json.dumps({'content': error_msg, 'type': 'text'})}\n\n"
 
         yield "data: [DONE]\n\n"
 
@@ -395,6 +164,7 @@ bot = Chatbot()
 class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
+    model: str = "gemini-2.5-flash"
 
 
 class SessionRequest(BaseModel):
@@ -493,7 +263,7 @@ async def chat_stream(request: ChatRequest):
         raise HTTPException(400, "Message cannot be empty")
 
     return StreamingResponse(
-        bot.stream_chat(request.message, request.session_id),
+        bot.stream_chat(request.message, request.session_id, request.model),
         media_type="text/event-stream"
     )
 
@@ -549,15 +319,15 @@ async def health_check():
     return {
         "status": "healthy",
         "sessions_count": len(bot.store),
-        "version": "3.0.0",
-        "supported_format": "compressed_matrix"
+        "version": "4.0.0-simple",
+        "features": "basic_chat"
     }
 
 
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 Starting SDRF-GPT service (Simplified Version)...")
+    print("🚀 Starting Simple Chat service...")
     print("📝 System prompt loaded")
-    print("🔧 Supports compressed_matrix format only")
+    print("🔧 Basic chat functionality only")
     print("✅ Service ready: http://127.0.0.1:8000")
     uvicorn.run(app, host="127.0.0.1", port=8000)

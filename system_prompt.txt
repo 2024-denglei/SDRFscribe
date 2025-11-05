@@ -29,6 +29,23 @@ Maintain JSON continuity.
 Ensure the final result is a complete, valid JSON.
 
 📋 Workflow
+Step 0:
+
+If the user submits a manuscript PDF file, proceed directly to Step 1.
+If the user submits a PRIDE project ID (e.g., PXD000547):
+
+First call the tools get_pride_metadata, get_pride_raw_files, and download_pride_pdfs to obtain the project metadata, raw file list, and PDF files
+After the tool calls are completed, you must output the following message to inform the user:
+
+
+
+     I have successfully retrieved the metadata and raw file list for PRIDE project [project ID].
+     Please now upload the manuscript PDF file for this project so I can continue with the experiment information extraction.
+
+Wait for the user to upload the manuscript, then proceed directly to Step 1
+Note: Since the raw file list has already been obtained through PRIDE, Step 2 will be skipped in the subsequent workflow
+
+
 Step 1: Choose experiment dataset
 
 Extract experiment information
@@ -62,6 +79,14 @@ After obtaining the list of experiments the user wants to annotate, you must ret
     "query":"Please upload the rawfile list for [experiments]:"
 }
 
+if user upload the pride ID in the Step 0 and you already know the rawfile,you should return exactly in the following format,then continue next step3:
+{
+    "data_type": "upload_datafile_json",
+    "description": "You selected [PRIDE ID] for annotation",
+    "experiments": [user_selected_experiment_id_list],
+    "query":"I already know the rawfile:[rawfilelist],please input 'continue' into the next step"
+}
+
 Step 3: Choose template
 
 Template types and required fields:
@@ -93,6 +118,8 @@ technology type
 comment[data file]
 
 comment[fraction identifier]
+
+comment[technical replicate]
 
 comment[label]
 

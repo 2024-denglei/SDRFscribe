@@ -428,7 +428,7 @@
                     <div class="right-actions">
                         <select class="model-selector" id="modelSelector">
                             <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                         </select>
                         <button class="send-btn" onclick="sendMessage()" id="sendBtn" title="Send message">↑</button>
                     </div>
@@ -440,238 +440,318 @@
     </div>
 
     <script>
-        let currentSessionId = 'default';
-        let isUploading = false;
+    let currentSessionId = 'default';
+    let isUploading = false;
 
-        function init() {
-            loadSessions();
-            loadSessionHistory(currentSessionId);
+    function init() {
+        loadSessions();
+        loadSessionHistory(currentSessionId);
+    }
+
+    function autoResize(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    }
+
+    function handleKeyDown(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
         }
+    }
 
-        function autoResize(textarea) {
-            textarea.style.height = 'auto';
-            textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
-        }
+    function createNewSession() {
+        const sessionId = 'session_' + Date.now();
+        currentSessionId = sessionId;
+        clearMessages();
+        addMessage('assistant', '👋 Hello! I\'m your SDRFscribe assistant. Please upload the manuscript or the PRIDE ID(PXD)');
+        loadSessions();
+    }
 
-        function handleKeyDown(event) {
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                sendMessage();
-            }
-        }
+    function goHome() {
+        window.location.href = '/home';
+    }
 
-        function createNewSession() {
-            const sessionId = 'session_' + Date.now();
-            currentSessionId = sessionId;
-            clearMessages();
-            addMessage('assistant', '👋 Hello! I\'m your SDRFscribe assistant. Please upload the manuscript or the PRIDE ID(PXD)');
-            loadSessions();
-        }
-
-        function goHome() {
-            window.location.href = '/home';
-        }
-
-        async function clearCurrentSession() {
-            if (confirm('Are you sure you want to clear this session?')) {
-                try {
-                    const response = await fetch('/sessions/clear', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ session_id: currentSessionId })
-                    });
-                    if (response.ok) {
-                        clearMessages();
-                        addMessage('assistant', '👋 Hello! I\'m your SDRFscribe assistant. Please upload the manuscript or the PRIDE ID(PXD)');
-                    }
-                } catch (error) {
-                    console.error('Clear session failed:', error);
-                }
-            }
-        }
-
-        async function loadSessions() {
+    async function clearCurrentSession() {
+        if (confirm('Are you sure you want to clear this session?')) {
             try {
-                const response = await fetch('/sessions');
-                const data = await response.json();
-                const sessionsList = document.getElementById('sessionsList');
-                sessionsList.innerHTML = '';
-                data.sessions.forEach(session => {
-                    const sessionDiv = document.createElement('div');
-                    sessionDiv.className = `session-item ${session.id === currentSessionId ? 'active' : ''}`;
-                    sessionDiv.textContent = session.title;
-                    sessionDiv.onclick = () => switchSession(session.id);
-                    sessionsList.appendChild(sessionDiv);
-                });
-            } catch (error) {
-                console.error('Load sessions failed:', error);
-            }
-        }
-
-        async function switchSession(sessionId) {
-            currentSessionId = sessionId;
-            clearMessages();
-            await loadSessionHistory(sessionId);
-            loadSessions();
-        }
-
-        async function loadSessionHistory(sessionId) {
-            try {
-                const response = await fetch(`/sessions/${sessionId}/history`);
-                const data = await response.json();
-                if (data.history.length === 0) {
-                    addMessage('assistant', "👋 Hello! I'm your SDRFscribe assistant. Please upload the manuscript or the PRIDE ID(PXD)");
-                } else {
-                    data.history.forEach(msg => {
-                        addMessage(msg.role, msg.content, false);
-                    });
-                    const messagesDiv = document.getElementById('messages');
-                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                }
-            } catch (error) {
-                console.error('Load history failed:', error);
-            }
-        }
-
-        function clearMessages() {
-            document.getElementById('messages').innerHTML = '';
-        }
-
-        function showUploadStatus(message, isError = false) {
-            const status = document.getElementById('uploadStatus');
-            status.textContent = message;
-            status.className = 'upload-status show' + (isError ? ' error' : '');
-            setTimeout(() => status.classList.remove('show'), 3000);
-        }
-
-        async function handleFileUpload() {
-            const fileInput = document.getElementById('fileInput');
-            const files = fileInput.files;
-            if (files.length === 0) return;
-            isUploading = true;
-            showUploadStatus('📤 Uploading files...');
-            try {
-                const formData = new FormData();
-                for (let file of files) {
-                    formData.append('files', file);
-                }
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                const result = await response.json();
-                if (result.status === 'success') {
-                    showUploadStatus(`✅ Uploaded ${result.file_count} file(s): ${result.filenames.join(', ')}`);
-                    const messageInput = document.getElementById('messageInput');
-                    messageInput.value = `Please analyze the uploaded file(s):\n\n${result.content}`;
-                    autoResize(messageInput);
-                    fileInput.value = '';
-                } else {
-                    showUploadStatus('❌ Upload failed', true);
-                }
-            } catch (error) {
-                console.error('Upload failed:', error);
-                showUploadStatus(`❌ Upload failed: ${error.message}`, true);
-            } finally {
-                isUploading = false;
-            }
-        }
-
-        async function sendMessage() {
-            const messageInput = document.getElementById('messageInput');
-            const sendBtn = document.getElementById('sendBtn');
-            const modelSelector = document.getElementById('modelSelector');
-            const message = messageInput.value.trim();
-            if (!message || isUploading) return;
-
-            sendBtn.disabled = true;
-            sendBtn.innerHTML = '<div class="spinner"></div>';
-            addMessage('user', message);
-            messageInput.value = '';
-            messageInput.style.height = 'auto';
-
-            try {
-                const response = await fetch('/chat/stream', {
+                const response = await fetch('/sessions/clear', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: message,
-                        session_id: currentSessionId,
-                        model: modelSelector.value
-                    })
+                    body: JSON.stringify({ session_id: currentSessionId })
                 });
+                if (response.ok) {
+                    clearMessages();
+                    addMessage('assistant', '👋 Hello! I\'m your SDRFscribe assistant. Please upload the manuscript or the PRIDE ID(PXD)');
+                }
+            } catch (error) {
+                console.error('Clear session failed:', error);
+            }
+        }
+    }
 
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    async function loadSessions() {
+        try {
+            const response = await fetch('/sessions');
+            const data = await response.json();
+            const sessionsList = document.getElementById('sessionsList');
+            sessionsList.innerHTML = '';
+            data.sessions.forEach(session => {
+                const sessionDiv = document.createElement('div');
+                sessionDiv.className = `session-item ${session.session_id === currentSessionId ? 'active' : ''}`;
+                sessionDiv.textContent = session.name;
+                sessionDiv.onclick = () => switchSession(session.session_id);
+                sessionsList.appendChild(sessionDiv);
+            });
+        } catch (error) {
+            console.error('Load sessions failed:', error);
+        }
+    }
 
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let accumulatedContent = '';
+    async function switchSession(sessionId) {
+        currentSessionId = sessionId;
+        clearMessages();
+        await loadSessionHistory(sessionId);
+        loadSessions();
+    }
 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
+    async function loadSessionHistory(sessionId) {
+        try {
+            const response = await fetch(`/sessions/${sessionId}/history`);
+            const data = await response.json();
+            if (data.history.length === 0) {
+                addMessage('assistant', "👋 Hello! I'm your SDRFscribe assistant. Please upload the manuscript or the PRIDE ID(PXD)");
+            } else {
+                data.history.forEach(msg => {
+                    addMessage(msg.role, msg.content, false);
+                });
+                const messagesDiv = document.getElementById('messages');
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }
+        } catch (error) {
+            console.error('Load history failed:', error);
+        }
+    }
 
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
+    function clearMessages() {
+        document.getElementById('messages').innerHTML = '';
+    }
 
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const data = line.slice(6);
-                            if (data === '[DONE]') break;
+    function showUploadStatus(message, isError = false) {
+        const status = document.getElementById('uploadStatus');
+        status.textContent = message;
+        status.className = 'upload-status show' + (isError ? ' error' : '');
+        setTimeout(() => status.classList.remove('show'), 3000);
+    }
 
-                            try {
-                                const parsed = JSON.parse(data);
-                                if (parsed.type === 'text' && parsed.content) {
-                                    accumulatedContent += parsed.content;
-                                    updateLastMessage(accumulatedContent);
-                                } else if (parsed.type === 'tool_call' || parsed.type === 'tool_result' || parsed.type === 'error') {
-                                    const role = 'assistant';
-                                    const content = `[${parsed.type.toUpperCase()}] ${parsed.content || ''}`;
-                                    addMessage(role, content);
-                                }
-                            } catch (e) {
-                                console.warn('Could not parse:', data, e);
+    async function handleFileUpload() {
+        const fileInput = document.getElementById('fileInput');
+        const files = fileInput.files;
+        if (files.length === 0) return;
+        isUploading = true;
+        showUploadStatus('📤 Uploading files...');
+        try {
+            const formData = new FormData();
+            for (let file of files) {
+                formData.append('files', file);
+            }
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            if (result.status === 'success') {
+                showUploadStatus(`✅ Uploaded ${result.file_count} file(s): ${result.filenames.join(', ')}`);
+                const messageInput = document.getElementById('messageInput');
+                messageInput.value = `Please analyze the uploaded file(s):\n\n${result.content}`;
+                autoResize(messageInput);
+                fileInput.value = '';
+            } else {
+                showUploadStatus('❌ Upload failed', true);
+            }
+        } catch (error) {
+            console.error('Upload failed:', error);
+            showUploadStatus(`❌ Upload failed: ${error.message}`, true);
+        } finally {
+            isUploading = false;
+        }
+    }
+
+    async function sendMessage() {
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const modelSelector = document.getElementById('modelSelector');
+        const message = messageInput.value.trim();
+        if (!message || isUploading) return;
+
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<div class="spinner"></div>';
+        addMessage('user', message);
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+
+        // ✅ 关键修复: 分别管理工具消息和AI文本消息
+        let toolMessageId = null;  // 工具消息的 ID
+        let aiTextAccumulated = '';  // AI 文本累积器
+        let hasToolCalls = false;  // 是否有工具调用
+
+        try {
+            const response = await fetch('/chat/stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: message,
+                    session_id: currentSessionId,
+                    model: modelSelector.value
+                })
+            });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6).trim();
+                        if (data === '[DONE]') continue;  // ✅ 使用 continue 而不是 break
+
+                        try {
+                            const parsed = JSON.parse(data);
+
+                            // ✅ 处理 AI 文本回复
+                            if (parsed.type === 'text' && parsed.content) {
+                                aiTextAccumulated += parsed.content;
+                                updateOrCreateAIMessage(aiTextAccumulated);
                             }
+                            // ✅ 处理工具调用信息 (放在独立的工具消息框中)
+                            else if (parsed.type === 'tool_call') {
+                                hasToolCalls = true;
+                                if (!toolMessageId) {
+                                    toolMessageId = addToolMessage('');
+                                }
+                                appendToToolMessage(toolMessageId, parsed.content + '\n\n');
+                            }
+                            // ✅ 处理工具结果
+                            else if (parsed.type === 'tool_result') {
+                                if (toolMessageId) {
+                                    appendToToolMessage(toolMessageId, parsed.content + '\n\n');
+                                }
+                            }
+                            // ✅ 处理 SDRF 生成结果
+                            else if (parsed.type === 'sdrf_generated') {
+                                const sdrf_msg = `\n\n✅ SDRF file has been generated!\n📥 Download: ${parsed.filename}`;
+                                aiTextAccumulated += sdrf_msg;
+                                updateOrCreateAIMessage(aiTextAccumulated);
+                            }
+                            // ✅ 处理错误
+                            else if (parsed.type === 'error') {
+                                addMessage('assistant', `❌ Error: ${parsed.content}`);
+                            }
+                        } catch (e) {
+                            console.warn('Could not parse:', data, e);
                         }
                     }
                 }
-            } catch (error) {
-                console.error('Send failed:', error);
-                addMessage('assistant', '❌ Send failed, please retry');
-            } finally {
-                sendBtn.disabled = false;
-                sendBtn.textContent = '↑';
-                loadSessions();
             }
+        } catch (error) {
+            console.error('Send failed:', error);
+            addMessage('assistant', '❌ Send failed, please retry');
+        } finally {
+            sendBtn.disabled = false;
+            sendBtn.textContent = '→';
+            loadSessions();
         }
+    }
 
-        function addMessage(role, content, scroll = true) {
-            const messagesDiv = document.getElementById('messages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${role}`;
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
+    // ✅ 新增: 更新或创建 AI 消息
+    function updateOrCreateAIMessage(content) {
+        const messagesDiv = document.getElementById('messages');
+        let lastMessage = messagesDiv.lastElementChild;
+
+        // 检查最后一条消息是否是 AI 文本消息 (不是工具消息)
+        if (lastMessage &&
+            lastMessage.classList.contains('assistant') &&
+            !lastMessage.hasAttribute('data-tool-message')) {
+            // 更新现有消息
+            const contentDiv = lastMessage.querySelector('.message-content');
             contentDiv.textContent = content;
-            messageDiv.appendChild(contentDiv);
-            messagesDiv.appendChild(messageDiv);
-            if (scroll) {
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            }
+        } else {
+            // 创建新消息
+            addMessage('assistant', content);
         }
 
-        function updateLastMessage(content) {
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    // ✅ 新增: 创建工具消息框
+    function addToolMessage(content) {
+        const messagesDiv = document.getElementById('messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message assistant';
+        messageDiv.setAttribute('data-tool-message', 'true');  // 标记为工具消息
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        contentDiv.style.backgroundColor = '#fff3cd';  // 淡黄色背景
+        contentDiv.style.borderLeft = '4px solid #ffc107';
+        contentDiv.style.fontFamily = 'monospace';
+        contentDiv.style.fontSize = '13px';
+        contentDiv.style.whiteSpace = 'pre-wrap';
+        contentDiv.textContent = content;
+
+        messageDiv.appendChild(contentDiv);
+        messagesDiv.appendChild(messageDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        return messageDiv.id = 'tool-msg-' + Date.now();
+    }
+
+    // ✅ 新增: 追加内容到工具消息
+    function appendToToolMessage(messageId, content) {
+        const messageDiv = document.getElementById(messageId);
+        if (messageDiv) {
+            const contentDiv = messageDiv.querySelector('.message-content');
+            contentDiv.textContent += content;
             const messagesDiv = document.getElementById('messages');
-            let lastMessage = messagesDiv.lastElementChild;
-            if (!lastMessage || !lastMessage.classList.contains('assistant')) {
-                addMessage('assistant', content);
-            } else {
-                const contentDiv = lastMessage.querySelector('.message-content');
-                contentDiv.textContent = content;
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            }
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
+    }
 
-        window.onload = init;
+    function addMessage(role, content, scroll = true) {
+        const messagesDiv = document.getElementById('messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${role}`;
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        contentDiv.textContent = content;
+        messageDiv.appendChild(contentDiv);
+        messagesDiv.appendChild(messageDiv);
+        if (scroll) {
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    }
+
+    function updateLastMessage(content) {
+        const messagesDiv = document.getElementById('messages');
+        let lastMessage = messagesDiv.lastElementChild;
+        if (!lastMessage || !lastMessage.classList.contains('assistant')) {
+            addMessage('assistant', content);
+        } else {
+            const contentDiv = lastMessage.querySelector('.message-content');
+            contentDiv.textContent = content;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    }
+
+    window.onload = init;
     </script>
 </body>
 </html>

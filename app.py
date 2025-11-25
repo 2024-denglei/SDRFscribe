@@ -12,7 +12,6 @@ from langchain.chat_models import init_chat_model
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.runnables import RunnableWithMessageHistory
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 import json
 import pandas as pd
 import PyPDF2
@@ -20,9 +19,10 @@ from io import BytesIO, StringIO
 import re, os
 import asyncio
 from typing import List, Dict, Any, Optional
-from langchain_google_genai import ChatGoogleGenerativeAI
-
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
+# CHANGE 1: 导入 OpenAI 客户端
 from langchain_openai import ChatOpenAI
+
 import uuid
 from pathlib import Path
 # 导入 PRIDE 工具
@@ -32,9 +32,12 @@ from dotenv import load_dotenv, find_dotenv
 
 env_path = find_dotenv()
 load_dotenv(dotenv_path=env_path, override=True, verbose=True)
-print(os.getenv("GOOGLE_API_KEY"))
 
-app = FastAPI(title="PRIDE Chat API with Tools")
+# 打印 key 用于调试（生产环境请注意安全）
+print(f"API Base: http://127.0.0.1:9000/v1")
+print(f"API Key present: {bool(os.getenv('OPENAI_API_KEY'))}")
+
+app = FastAPI(title="PRIDE Chat API with Tools (Local Proxy)")
 
 # Allow CORS
 app.add_middleware(
@@ -60,19 +63,11 @@ TEMPLATE_FILES = {
 }
 
 # 模板文件目录路径
-TEMPLATE_DIR = Path("templates")  # 你需要将模板文件放在这个目录下
+TEMPLATE_DIR = Path("templates")
 
 
 def load_template_columns(template_name: str) -> List[str]:
-    """
-    根据模板名称加载模板文件的列顺序
-
-    Args:
-        template_name: 模板名称 (Human, Cell lines, Vertebrates, Non-vertebrates, Plants, Default)
-
-    Returns:
-        模板列名列表
-    """
+    """根据模板名称加载模板文件的列顺序"""
     template_name = template_name.strip().lower()
     template_file = TEMPLATE_FILES.get(template_name)
     if not template_file:
@@ -82,37 +77,20 @@ def load_template_columns(template_name: str) -> List[str]:
     if not template_path.exists():
         raise FileNotFoundError(f"Template file not found: {template_path}")
 
-    # 读取模板文件的第一行（列名）
     df_template = pd.read_csv(template_path, sep='\t', nrows=0)
     return df_template.columns.tolist()
 
 
 def reorder_dataframe_columns(df: pd.DataFrame, template_columns: List[str]) -> pd.DataFrame:
-    """
-    根据模板列顺序重新排列DataFrame的列
-    模板中的列按照模板顺序排列，其余列放在最右边
-
-    Args:
-        df: 原始DataFrame
-        template_columns: 模板列顺序
-
-    Returns:
-        重新排列后的DataFrame
-    """
-    # 获取DataFrame中存在的列
+    """根据模板列顺序重新排列DataFrame的列"""
     df_columns = df.columns.tolist()
-
-    # 按照模板顺序排列已存在的列
     ordered_columns = []
     for col in template_columns:
         if col in df_columns:
             ordered_columns.append(col)
 
-    # 添加模板中没有的额外列
     extra_columns = [col for col in df_columns if col not in template_columns]
     ordered_columns.extend(extra_columns)
-
-    # 重新排列DataFrame
     return df[ordered_columns]
 
 
@@ -120,21 +98,18 @@ def reorder_dataframe_columns(df: pd.DataFrame, template_columns: List[str]) -> 
 def detect_complete_information_json(text: str) -> Dict[str, Any]:
     """检测文本中是否包含complete_information_json数据"""
     try:
-        # 查找JSON数据
         json_pattern = r'\{.*?"data_type"\s*:\s*"complete_information_json".*?\}'
         matches = re.findall(json_pattern, text, re.DOTALL)
 
         if matches:
             for match in matches:
                 try:
-                    # 尝试解析JSON
                     json_data = json.loads(match)
                     if json_data.get("data_type") == "complete_information_json":
                         return json_data
                 except json.JSONDecodeError:
                     continue
 
-        # 如果没有找到完整的JSON，尝试查找包含data_type的大括号块
         bracket_pattern = r'\{[^{}]*"data_type"\s*:\s*"complete_information_json"[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
         bracket_matches = re.findall(bracket_pattern, text, re.DOTALL)
 
@@ -153,60 +128,39 @@ def detect_complete_information_json(text: str) -> Dict[str, Any]:
 
 
 def generate_sdrf_csv(json_data: Dict[str, Any]) -> str:
-    """
-    从complete_information_json生成SDRF CSV文件，基于模板列顺序
-
-    Args:
-        json_data: 包含complete_information_json的字典
-
-    Returns:
-        生成的SDRF文件名
-    """
+    """从complete_information_json生成SDRF CSV文件"""
     try:
-        # 获取模板名称
         template_name = json_data.get("template_name")
         if not template_name:
             raise ValueError("template_name not found in JSON data")
 
         print(f"Using template: {template_name}")
-
-        # 加载模板列顺序
         template_columns = load_template_columns(template_name)
-        print(f"Template columns: {template_columns}")
 
-        # 获取文件行数
         file_rows = int(json_data.get("file_rows", 0))
         if file_rows <= 0:
             raise ValueError("Invalid file_rows value")
 
-        # 创建DataFrame
         rows = []
-
         for i in range(file_rows):
             row = {}
-
-            # 获取项目id
             PXD_ID = json_data.get("PXD_ID", [])
 
-            # 处理constant_attributes - 每行都复制相同的值
             constant_attrs = json_data.get("constant_attributes", [])
             for attr_dict in constant_attrs:
                 for key, value in attr_dict.items():
                     row[key] = value
 
-            # 处理verity_attributes - 根据索引分配值
             verity_attrs = json_data.get("verity_attributes", [])
             for attr_dict in verity_attrs:
                 for key, value_list in attr_dict.items():
                     if isinstance(value_list, list) and len(value_list) > i:
                         row[key] = value_list[i]
                     elif isinstance(value_list, list) and len(value_list) > 0:
-                        # 如果列表长度不够，使用最后一个值
                         row[key] = value_list[-1]
                     else:
                         row[key] = ""
 
-            # 处理factor value
             factor_values = json_data.get("factor value", [])
             for factor_dict in factor_values:
                 for factor_name, factor_value_list in factor_dict.items():
@@ -217,7 +171,6 @@ def generate_sdrf_csv(json_data: Dict[str, Any]) -> str:
                     else:
                         row[f"factor value[{factor_name}]"] = ""
 
-            # 处理no_link_attributes - 分配到每行但不关联到rawfile
             no_link_attrs = json_data.get("no_link_attributes", [])
             for attr_dict in no_link_attrs:
                 for key, value_list in attr_dict.items():
@@ -228,7 +181,6 @@ def generate_sdrf_csv(json_data: Dict[str, Any]) -> str:
                     else:
                         row[key] = ""
 
-            # 处理no_value_attributes - 每行都复制相同的值
             no_value_attrs = json_data.get("no_value_attributes", [])
             for attr_dict in no_value_attrs:
                 for key, value_list in attr_dict.items():
@@ -239,21 +191,17 @@ def generate_sdrf_csv(json_data: Dict[str, Any]) -> str:
 
             rows.append(row)
 
-        # 创建DataFrame
         df = pd.DataFrame(rows)
-
-        # 根据模板列顺序重新排列DataFrame的列
         df = reorder_dataframe_columns(df, template_columns)
 
-        print(f"Final column order: {df.columns.tolist()}")
-
-        # 生成唯一的文件名
         filename = f"sdrf_{template_name.replace(' ', '_')}_{PXD_ID}.tsv"
+        # ⚠️ 请确保此路径存在
         filepath = f"E:/langchain_book/pythonProject/SDRFscribe/SDRFfiles/{filename}"
 
-        # 保存为TSV文件（使用制表符分隔）
-        df.to_csv(filepath, index=False, sep='\t')
+        # 确保目录存在
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
+        df.to_csv(filepath, index=False, sep='\t')
         print(f"SDRF file generated: {filepath}")
 
         return filename
@@ -268,7 +216,7 @@ def generate_sdrf_csv(json_data: Dict[str, Any]) -> str:
 class Chatbot:
     def __init__(self):
         # Load system prompt
-        with open('system_prompt.txt', 'r', encoding='utf-8') as f:
+        with open('E:/langchain_book/pythonProject/system_prompt_vesion0.2.txt', 'r', encoding='utf-8') as f:
             self.system_prompt = f.read().strip()
 
         # Load additional context if available
@@ -279,6 +227,7 @@ class Chatbot:
         except FileNotFoundError:
             self.sdrf_proteomic = ""
 
+        # 注意：我们在 stream_chat 中手动构建消息列表，不再强依赖这个模板
         self.prompt_template = ChatPromptTemplate.from_messages([
             ('system', '{system_prompt}'),
             MessagesPlaceholder(variable_name='history'),
@@ -290,14 +239,19 @@ class Chatbot:
 
     def _get_model(self, model_name: str = "gemini-2.5-flash"):
         """动态创建模型实例并绑定工具"""
-        model = init_chat_model(
-            model_name,
-            model_provider="gemini",
+        api_key = os.getenv("OPENAI_API_KEY") or "sk-dummy-key"
+        base_url = "http://127.0.0.1:9000/v1"
+
+        # print(f"Connecting to model: {model_name} at {base_url}")
+
+        model = ChatOpenAI(
+            model=model_name,
+            openai_api_key=api_key,
+            openai_api_base=base_url,
             temperature=0,
-            timeout=240,
+            request_timeout=240,
         )
 
-        # 绑定 PRIDE 工具到模型
         model_with_tools = model.bind_tools(PRIDE_TOOLS)
         return model_with_tools
 
@@ -307,84 +261,144 @@ class Chatbot:
         return self.store[session_id]
 
     async def stream_chat(self, message: str, session_id: str = "default", model_name: str = "gemini-2.5-flash"):
-        """Enhanced streaming chat with tool support"""
+        """
+        修复版本: 模仿 CherryStudio 的实现逻辑
+        关键改进:
+        1. 分离流式输出和工具执行
+        2. 工具执行后自动触发第二次模型调用
+        3. 只在最终回复时才流式返回
+        """
         model = self._get_model(model_name)
-        chain = self.prompt_template | model
-        chain_with_history = RunnableWithMessageHistory(
-            chain,
-            self._get_message_history,
-            input_messages_key="input",
-            history_messages_key="history",
-        )
+        history_obj = self._get_message_history(session_id)
 
-        config = {"configurable": {"session_id": session_id}}
+        # 添加用户消息
+        history_obj.add_message(HumanMessage(content=message))
+
+        MAX_ITERATIONS = 10  # 最大迭代次数
+        iteration = 0
 
         try:
-            accumulated_content = ""
+            while iteration < MAX_ITERATIONS:
+                iteration += 1
 
-            # Stream the response
-            async for chunk in chain_with_history.astream({
-                "input": message,
-                "system_prompt": self.system_prompt
-            }, config=config):
+                # 构建完整消息列表
+                messages = [SystemMessage(content=self.system_prompt)] + history_obj.messages
 
-                # 处理普通文本内容
-                if hasattr(chunk, 'content') and chunk.content:
-                    accumulated_content += chunk.content
-                    yield f"data: {json.dumps({'content': chunk.content, 'type': 'text'})}\n\n"
+                # ========================================
+                # 第一步: 获取模型的完整响应 (非流式)
+                # ========================================
+                response = await model.ainvoke(messages)
 
-                # 处理工具调用 - 关键：使用 elif，并格式化消息
-                elif hasattr(chunk, 'tool_calls') and chunk.tool_calls:
-                    for tool_call in chunk.tool_calls:
+                # ========================================
+                # 第二步: 检查是否有工具调用
+                # ========================================
+                if response.tool_calls:
+                    # 保存 AI 的工具调用消息
+                    history_obj.add_message(response)
+
+                    # 通知前端正在执行工具
+                    tool_info = f"🔧 检测到 {len(response.tool_calls)} 个工具调用"
+                    yield f"data: {json.dumps({'content': tool_info, 'type': 'tool_call'})}\n\n"
+
+                    # 执行所有工具
+                    for tool_call in response.tool_calls:
                         tool_name = tool_call.get('name', 'unknown')
                         tool_args = tool_call.get('args', {})
-                        tool_call_id = tool_call.get('id', '')
+                        tool_call_id = tool_call.get('id', str(uuid.uuid4()))
 
-                        # ✅ 发送友好的工具调用消息
-                        tool_info = f"🔧 正在使用工具: {tool_name}\n📝 参数: {json.dumps(tool_args, ensure_ascii=False, indent=2)}"
-                        yield f"data: {json.dumps({'content': tool_info, 'type': 'tool_call'})}\n\n"
+                        # 显示工具信息
+                        tool_detail = f"\n📋 工具: {tool_name}\n💬 参数: {json.dumps(tool_args, ensure_ascii=False)}"
+                        yield f"data: {json.dumps({'content': tool_detail, 'type': 'tool_call'})}\n\n"
 
                         try:
-                            # 执行工具调用
+                            # 执行工具
                             result = await self._execute_tool(tool_call)
 
-                            # ✅ 发送格式化的工具结果
                             if result.get('status') == 'success':
-                                tool_result_msg = f"📊 工具执行成功\n{json.dumps(result.get('data'), ensure_ascii=False, indent=2)}"
+                                result_data = result.get('data')
+
+                                # 显示结果摘要
+                                result_summary = f"✅ 执行成功"
+                                if isinstance(result_data, dict):
+                                    if 'project_id' in result_data:
+                                        result_summary += f" - 项目: {result_data['project_id']}"
+                                    if 'file_count' in result_data:
+                                        result_summary += f" - 文件数: {result_data['file_count']}"
+
+                                yield f"data: {json.dumps({'content': result_summary, 'type': 'tool_result'})}\n\n"
+
+                                # 序列化结果
+                                tool_output = json.dumps(result_data, ensure_ascii=False)
                             else:
-                                tool_result_msg = f"❌ 工具执行失败: {result.get('error', 'Unknown error')}"
+                                error_msg = f"❌ 工具执行失败: {result.get('error')}"
+                                yield f"data: {json.dumps({'content': error_msg, 'type': 'tool_result'})}\n\n"
+                                tool_output = f"Error: {result.get('error')}"
 
-                            yield f"data: {json.dumps({'content': tool_result_msg, 'type': 'tool_result'})}\n\n"
-
-                            # 将工具结果添加到消息历史
-                            message_history = self._get_message_history(session_id)
+                            # 保存工具结果到历史
                             tool_message = ToolMessage(
-                                content=json.dumps(result, ensure_ascii=False),
+                                content=tool_output,
                                 tool_call_id=tool_call_id
                             )
-                            message_history.add_message(tool_message)
+                            history_obj.add_message(tool_message)
 
                         except Exception as e:
-                            error_msg = f"❌ 工具执行错误: {str(e)}"
+                            error_msg = f"❌ 工具异常: {str(e)}"
                             yield f"data: {json.dumps({'content': error_msg, 'type': 'error'})}\n\n"
 
-            # 检测并生成SDRF文件（保持原有逻辑）
-            json_data = detect_complete_information_json(accumulated_content)
-            if json_data:
-                try:
-                    filename = generate_sdrf_csv(json_data)
-                    download_link = f"/download/sdrf/{filename}"
+                            # 即使出错也要添加 ToolMessage
+                            tool_message = ToolMessage(
+                                content=f"Error: {str(e)}",
+                                tool_call_id=tool_call_id
+                            )
+                            history_obj.add_message(tool_message)
 
-                    yield f"data: {json.dumps({'type': 'sdrf_generated', 'filename': filename, 'download_link': download_link})}\n\n"
-                    yield f"data: {json.dumps({'content': f'\\n\\n✅ SDRF file has been generated successfully!\\n📥 Download: [{filename}]({download_link})', 'type': 'text'})}\n\n"
-                except Exception as e:
-                    error_msg = f"Error generating SDRF file: {str(e)}"
-                    yield f"data: {json.dumps({'content': error_msg, 'type': 'error'})}\n\n"
+                    # ========================================
+                    # 第三步: 工具执行完毕,继续循环
+                    # 下一轮迭代会带着工具结果再次调用模型
+                    # ========================================
+                    yield f"data: {json.dumps({'content': '\n🤔 正在分析工具结果...', 'type': 'tool_call'})}\n\n"
+                    continue  # 关键: 继续循环,让模型看到工具结果
 
+                # ========================================
+                # 第四步: 没有工具调用,说明是最终回复
+                # 此时才进行流式输出
+                # ========================================
+                else:
+                    # 保存 AI 消息
+                    history_obj.add_message(response)
+
+                    # 流式输出最终回复
+                    final_content = response.content
+
+                    # 模拟流式效果 (因为 ainvoke 已经获取了完整内容)
+                    # 如果需要真正的流式,这里应该再次调用 astream
+                    if final_content:
+                        # 分块发送以模拟流式效果
+                        chunk_size = 5  # 每次发送5个字符
+                        for i in range(0, len(final_content), chunk_size):
+                            chunk = final_content[i:i + chunk_size]
+                            yield f"data: {json.dumps({'content': chunk, 'type': 'text'})}\n\n"
+                            await asyncio.sleep(0.01)  # 小延迟,模拟打字效果
+
+                    # 检测并生成 SDRF
+                    json_data = detect_complete_information_json(final_content)
+                    if json_data:
+                        try:
+                            filename = generate_sdrf_csv(json_data)
+                            download_link = f"/download/sdrf/{filename}"
+                            yield f"data: {json.dumps({'type': 'sdrf_generated', 'filename': filename, 'download_link': download_link})}\n\n"
+                            yield f"data: {json.dumps({'content': f'\\n\\n✅ SDRF 文件已生成!\\n📥 下载: [{filename}]({download_link})', 'type': 'text'})}\n\n"
+                        except Exception as e:
+                            yield f"data: {json.dumps({'content': f'SDRF 生成错误: {str(e)}', 'type': 'error'})}\n\n"
+
+                    # 任务完成,退出循环
+                    break
+
+            # 发送结束信号
             yield "data: [DONE]\n\n"
 
         except Exception as e:
-            error_msg = f"Error in stream_chat: {str(e)}"
+            error_msg = f"❌ 对话错误: {str(e)}"
             print(error_msg)
             import traceback
             traceback.print_exc()
@@ -407,7 +421,6 @@ class Chatbot:
         return {"status": "error", "error": f"Tool {tool_name} not found"}
 
     def get_sessions(self):
-        """Get all sessions with their names"""
         return [
             {
                 "session_id": session_id,
@@ -418,14 +431,12 @@ class Chatbot:
         ]
 
     def rename_session(self, session_id: str, new_name: str) -> bool:
-        """Rename a session"""
         if session_id in self.store:
             self.session_names[session_id] = new_name
             return True
         return False
 
     def get_session_history(self, session_id: str) -> List[Dict]:
-        """Get session history"""
         if session_id not in self.store:
             return []
 
@@ -435,12 +446,13 @@ class Chatbot:
             if isinstance(msg, HumanMessage):
                 history.append({"role": "user", "content": msg.content})
             elif isinstance(msg, AIMessage):
-                history.append({"role": "assistant", "content": msg.content})
+                # 过滤掉纯工具调用的中间消息，只显示有内容的回复
+                if msg.content:
+                    history.append({"role": "assistant", "content": msg.content})
 
         return history
 
     def clear_session(self, session_id: str):
-        """Clear session history"""
         if session_id in self.store:
             self.store[session_id] = ChatMessageHistory()
 
@@ -453,6 +465,9 @@ bot = Chatbot()
 class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
+    # CHANGE 5: 默认模型建议改为您的代理池支持的模型名称
+    # 既然您用的是 Gemini Key 池，可能还是习惯叫 "gemini-1.5-pro" 或 "gemini-1.5-flash"
+    # 您的代理应该能把这个名字映射到对应的 API Key
     model: str = "gemini-2.5-flash"
 
 
@@ -471,7 +486,7 @@ class PrideRequest(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"message": "PRIDE Chat API with Tools", "version": "5.0.0"}
+    return {"message": "PRIDE Chat API with Tools (OpenAI Interface)", "version": "5.1.0"}
 
 
 @app.get("/home")
@@ -484,9 +499,8 @@ async def chat():
     return FileResponse("static/chat.html")
 
 
-# File processing
+# File processing (保持不变)
 def process_file(file_content: bytes, filename: str) -> str:
-    """Process uploaded file and return text content"""
     file_ext = filename.lower().split('.')[-1]
 
     if file_ext == 'pdf':
@@ -601,14 +615,15 @@ async def get_all_pride_data_api(request: PrideRequest):
         raise HTTPException(500, f"Failed to get PRIDE data: {str(e)}")
 
 
-
-
 # SDRF file download endpoint
 @app.get("/download/sdrf/{filename}")
 async def download_sdrf_file(filename: str):
     """Download generated SDRF CSV file"""
     try:
-        file_path = f"/home/claude/{filename}"
+        # ⚠️ 请确保此路径与 generate_sdrf_csv 中的路径一致
+        base_dir = "E:/langchain_book/pythonProject/SDRFscribe/SDRFfiles/"
+        file_path = os.path.join(base_dir, filename)
+
         if not os.path.exists(file_path):
             raise HTTPException(404, "File not found")
 
@@ -673,8 +688,8 @@ async def health_check():
     return {
         "status": "healthy",
         "sessions_count": len(bot.store),
-        "version": "5.0.0-with-pride-tools",
-        "features": "chat_with_pride_tools",
+        "version": "5.1.0-local-proxy",
+        "features": "chat_with_pride_tools_openai_proxy",
         "available_tools": [tool.name for tool in PRIDE_TOOLS]
     }
 
@@ -695,9 +710,9 @@ async def get_available_tools():
 if __name__ == "__main__":
     import uvicorn
     print("🚀 Starting PRIDE Chat service with tools...")
+    print("🔌 Connected to Local Proxy: http://127.0.0.1:9000/v1")
     print("📚 PRIDE tools loaded:")
     for tool in PRIDE_TOOLS:
         print(f"  - {tool.name}: {tool.description}")
-    print("🔧 System prompt loaded with PRIDE tool capabilities")
     print("✅ Service ready: http://127.0.0.1:8000")
     uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -1,6 +1,6 @@
 """
-PRIDE 数据库工具集 - LangChain Tools
-包含三个工具：获取元数据、获取原始文件列表、下载PDF文献
+PRIDE Database Toolset - LangChain Tools
+Contains three tools: Get Metadata, Get Raw File List, Download PDF Literature
 """
 
 import httpx
@@ -14,29 +14,29 @@ from langchain.tools import tool
 from typing import Dict, List, Optional
 
 
-# ==================== 工具 1: 获取 PRIDE 项目元数据 ====================
+# ==================== Tool 1: Get PRIDE Project Metadata ====================
 
 @tool
 async def get_pride_metadata(project_id: str) -> Dict:
     """
-    根据 PRIDE 项目 ID 获取项目元数据。
+    Retrieves project metadata based on the PRIDE Project ID.
 
     Args:
-        project_id: PRIDE 项目 ID，例如 "PXD000547"
+        project_id: PRIDE Project ID, e.g., "PXD000547"
 
     Returns:
-        包含项目元数据的字典，包括标题、描述、物种信息、发布日期等
+        Dictionary containing project metadata, including title, description, species information, publication date, etc.
     """
-    # 验证项目ID格式
+    # Validate Project ID format
     if not re.match(r"^PXD\d+$", project_id, re.IGNORECASE):
-        return {"error": f"无效的 PRIDE 项目 ID 格式: '{project_id}'"}
+        return {"error": f"Invalid PRIDE Project ID format: '{project_id}'"}
 
     api_url = f"https://www.ebi.ac.uk/pride/ws/archive/v2/projects/{project_id}"
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
     }
 
-    # 配置HTTP客户端以支持重试
+    # Configure HTTP client to support retries
     transport = httpx.AsyncHTTPTransport(retries=3)
 
     async with httpx.AsyncClient(headers=headers, timeout=30.0, transport=transport) as client:
@@ -51,60 +51,60 @@ async def get_pride_metadata(project_id: str) -> Dict:
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                return {"error": f"项目 '{project_id}' 不存在"}
+                return {"error": f"Project '{project_id}' does not exist"}
             else:
-                return {"error": f"HTTP 请求失败，状态码: {e.response.status_code}"}
+                return {"error": f"HTTP request failed, status code: {e.response.status_code}"}
         except Exception as e:
-            return {"error": f"获取元数据时出错: {type(e).__name__} - {str(e)}"}
+            return {"error": f"Error getting metadata: {type(e).__name__} - {str(e)}"}
 
 
-# ==================== 工具 2: 获取原始数据文件列表 ====================
+# ==================== Tool 2: Get Raw Data File List ====================
 
 @tool
 async def get_pride_raw_files(project_id: str) -> Dict:
     """
-    根据 PRIDE 项目 ID 获取原始数据文件(.raw)列表及其下载地址。
+    Retrieves a list of raw data files (.raw) and their download links based on the PRIDE Project ID.
 
     Args:
-        project_id: PRIDE 项目 ID，例如 "PXD000704"
+        project_id: PRIDE Project ID, e.g., "PXD000704"
 
     Returns:
-        包含项目 ID 和文件列表的字典，每个文件包含文件名和下载地址
+        Dictionary containing the project ID and a list of files, where each file includes the filename and download URL.
     """
-    # 验证项目ID格式
+    # Validate Project ID format
     if not re.match(r"^PXD\d+$", project_id, re.IGNORECASE):
-        return {"error": f"无效的 PRIDE 项目 ID 格式: {project_id}"}
+        return {"error": f"Invalid PRIDE Project ID format: {project_id}"}
 
     api_url = f"https://www.ebi.ac.uk/pride/ws/archive/v2/projects/{project_id}"
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
     }
 
-    # 配置HTTP客户端以支持重试
+    # Configure HTTP client to support retries
     transport = httpx.AsyncHTTPTransport(retries=10)
 
     async with httpx.AsyncClient(headers=headers, timeout=60.0, transport=transport) as client:
         try:
-            # 1. 从API获取项目元数据，获取发布日期
+            # 1. Get project metadata from API to retrieve publication date
             response = await client.get(api_url)
             response.raise_for_status()
             project_data = response.json()
 
             publication_date_str = project_data.get("publicationDate")
             if not publication_date_str:
-                return {"error": "无法从项目元数据中找到 'publicationDate'"}
+                return {"error": "Could not find 'publicationDate' in project metadata"}
 
-            # 2. 解析日期以获取年份和月份
+            # 2. Parse date to get year and month
             publication_date = datetime.strptime(publication_date_str, "%Y-%m-%d")
             year = publication_date.strftime("%Y")
             month = publication_date.strftime("%m")
 
-            # 3. 构建并访问FTP目录URL
+            # 3. Construct and access FTP directory URL
             ftp_url = f"https://ftp.pride.ebi.ac.uk/pride/data/archive/{year}/{month}/{project_id}/"
             ftp_response = await client.get(ftp_url)
             ftp_response.raise_for_status()
 
-            # 4. 解析FTP目录列表以查找.raw文件
+            # 4. Parse FTP directory listing to find .raw files
             soup = BeautifulSoup(ftp_response.text, 'html.parser')
             raw_files = []
 
@@ -125,20 +125,20 @@ async def get_pride_raw_files(project_id: str) -> Dict:
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                return {"error": f"项目 {project_id} 的 FTP 目录不存在"}
+                return {"error": f"FTP directory for project {project_id} does not exist"}
             else:
-                return {"error": f"HTTP 请求失败，状态码: {e.response.status_code}"}
+                return {"error": f"HTTP request failed, status code: {e.response.status_code}"}
         except Exception as e:
-            return {"error": f"获取原始文件列表时出错: {type(e).__name__} - {str(e)}"}
+            return {"error": f"Error getting raw file list: {type(e).__name__} - {str(e)}"}
 
 
-# ==================== 工具 3: 下载 PDF 文献 ====================
+# ==================== Tool 3: Download PDF Literature ====================
 
 async def _get_pdf_content(doi: str, client: httpx.AsyncClient) -> Optional[bytes]:
     """
-    根据 DOI 从多个 Sci-Hub 备选域名下载 PDF 内容（增强版）
+    Download PDF content from multiple alternative Sci-Hub domains based on DOI (enhanced version)
     """
-    # 可用 Sci-Hub 域名列表（可扩展）
+    # List of available Sci-Hub domains (extensible)
     SCI_HUB_DOMAINS = [
         "https://sci-hub.ee",
         "https://sci-hub.ru",
@@ -154,7 +154,7 @@ async def _get_pdf_content(doi: str, client: httpx.AsyncClient) -> Optional[byte
         "Referer": "https://sci-hub.st/"
     }
 
-    # 尝试多个 Sci-Hub 域名
+    # Try multiple Sci-Hub domains
     for base_url in SCI_HUB_DOMAINS:
         scihub_url = f"{base_url}/{doi}"
         try:
@@ -167,7 +167,7 @@ async def _get_pdf_content(doi: str, client: httpx.AsyncClient) -> Optional[byte
 
             soup = BeautifulSoup(html_content, "html.parser")
 
-            # 多策略提取 PDF 链接
+            # Multi-strategy PDF link extraction
             pdf_url = None
             possible_selectors = [
                 "iframe#pdf", "embed#pdf", "iframe", "embed", "object", "a[href$='.pdf']"
@@ -184,7 +184,7 @@ async def _get_pdf_content(doi: str, client: httpx.AsyncClient) -> Optional[byte
             if not pdf_url:
                 continue
 
-            # 处理相对路径
+            # Handle relative paths
             if pdf_url.startswith("//"):
                 pdf_url = "https:" + pdf_url
             elif not pdf_url.startswith("http"):
@@ -193,31 +193,31 @@ async def _get_pdf_content(doi: str, client: httpx.AsyncClient) -> Optional[byte
             pdf_response = await client.get(pdf_url, headers=headers)
             pdf_response.raise_for_status()
             if pdf_response.content.startswith(b"%PDF"):
-                print("download success")
+                print("Download successful")
                 return pdf_response.content
 
         except Exception as e:
-            print(f"⚠️ {base_url} 下载失败: {type(e).__name__} - {e}")
+            print(f"⚠️ {base_url} Download failed: {type(e).__name__} - {e}")
             continue
 
-        # === 如果 Sci-Hub 全部失败，尝试通过 DOI 跳转 ===
+        # === If all Sci-Hub attempts fail, try redirecting via DOI ===
         try:
             doi_url = f"https://doi.org/{doi}"
             redirect_response = await client.get(doi_url, headers=headers, follow_redirects=True)
             redirect_response.raise_for_status()
 
-            # 检查是否直接返回PDF
+            # Check if PDF is returned directly
             if redirect_response.content.startswith(b"%PDF"):
                 return redirect_response.content
 
-            # 从最终URL再次尝试PDF链接
+            # Try PDF link again from the final URL
             if redirect_response.headers.get("content-type", "").startswith("application/pdf"):
                 return redirect_response.content
 
         except Exception:
             pass
 
-    # 若全部失败，返回 None
+    # If all attempts fail, return None
     return None
 
 
@@ -225,27 +225,27 @@ async def _get_pdf_content(doi: str, client: httpx.AsyncClient) -> Optional[byte
 @tool
 async def download_pride_pdf(project_id: str) -> Dict:
     """
-    根据 PRIDE 项目 ID 下载其关联的 PDF 文献。
-    文件将保存到 pdffiles/{project_id}/ 目录下。
+    Downloads the associated PDF literature based on the PRIDE Project ID.
+    The file will be saved to the pdffiles/{project_id}/ directory.
 
     Args:
-        project_id: PRIDE 项目 ID，例如 "PXD000547"
+        project_id: PRIDE Project ID, e.g., "PXD000547"
 
     Returns:
-        包含下载状态和文件路径的字典
+        Dictionary containing the download status and file path
     """
-    # 清理并验证输入参数
+    # Clean and validate input parameters
     project_id = project_id.strip()
 
     if not re.match(r"^PXD\d+$", project_id, re.IGNORECASE):
-        return {"error": f"无效的 PRIDE 项目 ID 格式: '{project_id}'"}
+        return {"error": f"Invalid PRIDE Project ID format: '{project_id}'"}
 
     api_url = f"https://www.ebi.ac.uk/pride/ws/archive/v2/projects/{project_id}"
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
     }
 
-    # 禁用SSL验证，设置合理的超时
+    # Disable SSL verification and set reasonable timeout
     timeout_config = httpx.Timeout(15.0, read=300.0)
     async with httpx.AsyncClient(
             headers=headers,
@@ -254,24 +254,24 @@ async def download_pride_pdf(project_id: str) -> Dict:
             verify=False
     ) as client:
         try:
-            # 1. 获取项目元数据
+            # 1. Get project metadata
             api_response = await client.get(api_url)
             api_response.raise_for_status()
             metadata = api_response.json()
 
-            # 2. 从元数据中提取DOI
+            # 2. Extract DOI from metadata
             references = metadata.get("references", [])
             if not references or not (doi := references[0].get("doi")):
-                return {"error": "项目中未找到 DOI"}
+                return {"error": "DOI not found in project"}
 
-            # 3. 下载PDF内容
+            # 3. Download PDF content
             pdf_content = await _get_pdf_content(doi, client)
 
             if not pdf_content:
-                return {"error": f"无法为 DOI '{doi}' 下载 PDF"}
+                return {"error": f"Unable to download PDF for DOI '{doi}'"}
 
-            # 4. 保存PDF到指定目录
-            # 确定保存路径（相对于当前工作目录）
+            # 4. Save PDF to the specified directory
+            # Determine save path (relative to current working directory)
             save_dir = pathlib.Path("pdffiles") / project_id
             save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -290,14 +290,14 @@ async def download_pride_pdf(project_id: str) -> Dict:
             }
 
         except httpx.HTTPStatusError as e:
-            return {"error": f"HTTP 请求失败 (状态码: {e.response.status_code})"}
+            return {"error": f"HTTP request failed (status code: {e.response.status_code})"}
         except Exception as e:
-            return {"error": f"下载 PDF 时出错: {type(e).__name__} - {str(e)}"}
+            return {"error": f"Error downloading PDF: {type(e).__name__} - {str(e)}"}
 
 
-# ==================== 导出所有工具 ====================
+# ==================== Export All Tools ====================
 
-# 所有可用的 PRIDE 工具列表
+# List of all available PRIDE tools
 PRIDE_TOOLS = [
     get_pride_metadata,
     get_pride_raw_files,
@@ -305,17 +305,17 @@ PRIDE_TOOLS = [
 ]
 
 
-# ==================== 便捷函数：一次性获取所有 PRIDE 数据 ====================
+# ==================== Convenience Function: Get All PRIDE Data at Once ====================
 
 async def get_all_pride_data(project_id: str) -> Dict:
     """
-    一次性获取 PRIDE 项目的所有数据：元数据、原始文件列表和 PDF
+    Get all PRIDE project data at once: metadata, raw file list, and PDF
 
     Args:
-        project_id: PRIDE 项目 ID
+        project_id: PRIDE Project ID
 
     Returns:
-        包含所有数据的字典
+        Dictionary containing all data
     """
     result = {
         "project_id": project_id,
@@ -325,21 +325,21 @@ async def get_all_pride_data(project_id: str) -> Dict:
         "errors": []
     }
 
-    # 获取元数据
+    # Get metadata
     metadata = await get_pride_metadata.ainvoke({"project_id": project_id})
     if "error" in metadata:
-        result["errors"].append(f"元数据: {metadata['error']}")
+        result["errors"].append(f"Metadata: {metadata['error']}")
     else:
         result["metadata"] = metadata
 
-    # 获取原始文件列表
+    # Get raw file list
     raw_files = await get_pride_raw_files.ainvoke({"project_id": project_id})
     if "error" in raw_files:
-        result["errors"].append(f"原始文件: {raw_files['error']}")
+        result["errors"].append(f"Raw Files: {raw_files['error']}")
     else:
         result["raw_files"] = raw_files
 
-    # 下载PDF
+    # Download PDF
     pdf = await download_pride_pdf.ainvoke({"project_id": project_id})
     if "error" in pdf:
         result["errors"].append(f"PDF: {pdf['error']}")

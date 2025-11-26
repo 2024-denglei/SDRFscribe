@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Chat Assistant</title>
+    <title>SDRF Chat Assistant</title>
     <style>
         * {
             margin: 0;
@@ -158,12 +158,12 @@
         }
 
         .message-content {
-            max-width: 70%;
+            max-width: 85%;
             padding: 15px 20px;
             border-radius: 18px;
             word-wrap: break-word;
             white-space: pre-wrap;
-            max-height: 500px;
+            max-height: 800px;
             overflow-y: auto;
             word-break: break-word;
         }
@@ -181,9 +181,26 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
+        /* === NEW: Wide Mode for JSON Forms (占用80%宽度) === */
+        .message.wide-mode {
+            justify-content: center; /* 居中显示 */
+            width: 100%;
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+        .message.wide-mode .message-content {
+            max-width: 80%;  /* 核心修改：最大宽度 80% */
+            width: 80%;      /* 强制宽度 80% */
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08); /* 加深阴影 */
+        }
+
         .message-content::-webkit-scrollbar,
         .messages::-webkit-scrollbar {
             width: 8px;
+            height: 8px;
         }
 
         .message-content::-webkit-scrollbar-track,
@@ -368,6 +385,220 @@
             }
         }
 
+        /* === 交互式表单样式 === */
+        .json-form-container {
+            background: #ffffff;
+            /* border: 1px solid #e0e0e0; */ /* 宽屏模式下外层已有边框，这里可去除 */
+            border-radius: 12px;
+            margin-top: 15px;
+            padding: 20px;
+            /* box-shadow: 0 4px 15px rgba(0,0,0,0.05); */
+            font-size: 14px;
+            animation: fadeIn 0.5s ease;
+            color: #333;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .form-header {
+            margin-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+
+        .form-header h3 {
+            color: #667eea;
+            font-size: 16px;
+            margin: 0;
+        }
+
+        .form-header .desc {
+            color: #888;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .form-section {
+            margin-bottom: 20px;
+        }
+
+        .form-section-title {
+            font-weight: 600;
+            color: #444;
+            margin-bottom: 10px;
+            display: block;
+            font-size: 13px;
+        }
+
+        /* 键值对网格布局 */
+        .kv-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        /* 统一输入框基础样式 (兼容 input 和 select) */
+        .form-input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 13px;
+            transition: all 0.2s;
+            background: #fafafa;
+        }
+
+        .form-input:focus {
+            border-color: #667eea;
+            background: white;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* 文本域只读状态样式 */
+        .form-input[readonly] {
+            cursor: default;
+        }
+
+        /* === 自适应高度 Textarea 样式 (替代原来的 input) === */
+        .auto-expand-textarea {
+            width: 100%;
+            min-height: 38px; /* 与原来的 input 高度近似 */
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 13px;
+            background: #fafafa;
+            resize: none; /* 禁止用户手动拖拽大小 */
+            overflow-y: hidden; /* 隐藏滚动条 */
+            line-height: 1.4;
+            box-sizing: border-box;
+            display: block;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .auto-expand-textarea:focus {
+            border-color: #667eea;
+            background: white;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* 表格样式 */
+        .table-wrapper {
+            overflow-x: auto;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .styled-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            min-width: 600px;
+        }
+
+        .styled-table thead tr {
+            background-color: #f8f9fa;
+            color: #444;
+            text-align: left;
+        }
+
+        .styled-table th, .styled-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+            /* 允许换行，顶部对齐 */
+            white-space: normal;
+            vertical-align: top;
+            min-width: 150px;
+        }
+
+        .styled-table tbody tr:last-of-type td {
+            border-bottom: 2px solid #667eea;
+        }
+
+        /* 表格内的 Textarea 微调 */
+        .styled-table .auto-expand-textarea {
+            background: transparent;
+            border: 1px solid transparent;
+            padding: 4px;
+            min-height: 30px;
+        }
+
+        .styled-table .auto-expand-textarea:hover {
+            border-color: #eee;
+            background: #fff;
+        }
+
+        .styled-table .auto-expand-textarea:focus {
+            border-color: #667eea;
+            background: #fff;
+            outline: none;
+        }
+
+        /* 按钮区域 */
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .btn-confirm {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-confirm:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-confirm:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .json-hidden {
+            display: none;
+        }
+
+        .toggle-json-btn {
+            font-size: 11px;
+            color: #999;
+            text-decoration: underline;
+            cursor: pointer;
+            margin-top: 5px;
+            display: inline-block;
+        }
+
         @media (max-width: 768px) {
             .container {
                 width: 100%;
@@ -384,8 +615,13 @@
             }
 
             .message-content {
-                max-width: 85%;
-                max-height: 400px;
+                max-width: 95%;
+            }
+
+            /* 移动端宽屏适配：稍微宽一点 */
+            .message.wide-mode .message-content {
+                max-width: 95%;
+                width: 95%;
             }
 
             .model-selector {
@@ -410,7 +646,7 @@
 
         <div class="chat-container">
             <div class="chat-header">
-                <h1>🤖 Simple Chat Assistant</h1>
+                <h1>🤖 SDRF Chat Assistant</h1>
                 <div class="header-buttons">
                     <button onclick="clearCurrentSession()">🗑️ Clear</button>
                     <button onclick="goHome()">🏠 Home</button>
@@ -424,7 +660,7 @@
                     <div class="left-actions">
                         <button class="action-btn" onclick="document.getElementById('fileInput').click()" title="Upload files">➕</button>
                     </div>
-                    <textarea class="main-input" id="messageInput" placeholder="How can I help you today?" rows="1" onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
+                    <textarea class="main-input" id="messageInput" placeholder="Enter PXD ID or describe your experiment..." rows="1" onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
                     <div class="right-actions">
                         <select class="model-selector" id="modelSelector">
                             <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
@@ -448,9 +684,33 @@
         loadSessionHistory(currentSessionId);
     }
 
+    // 主输入框的自动调整
     function autoResize(textarea) {
         textarea.style.height = 'auto';
         textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    }
+
+    // ==========================================
+    // 📏 自适应高度工具函数 (用于表单内的Textarea)
+    // ==========================================
+    function adjustTextareaHeight(el) {
+        if (!el) return;
+        // 重置高度以重新计算缩小的情况
+        el.style.height = 'auto';
+        // 设置为滚动高度
+        el.style.height = (el.scrollHeight) + 'px';
+    }
+
+    // 批量初始化容器内所有 textarea 的高度
+    function initAutoResizeTextareas(container) {
+        // 选择所有带 auto-expand-textarea 类的，或者 form-input 是 textarea 的
+        const textareas = container.querySelectorAll('textarea.auto-expand-textarea, textarea.form-input');
+        textareas.forEach(ta => {
+            // 绑定输入事件
+            ta.addEventListener('input', () => adjustTextareaHeight(ta));
+            // 立即初始化高度
+            adjustTextareaHeight(ta);
+        });
     }
 
     function handleKeyDown(event) {
@@ -464,7 +724,7 @@
         const sessionId = 'session_' + Date.now();
         currentSessionId = sessionId;
         clearMessages();
-        addMessage('assistant', '👋 Hello! I\'m your SDRFscribe assistant. Please upload the manuscript or the PRIDE ID(PXD)');
+        addMessage('assistant', '👋 Hello! I\'m your SDRFscribe assistant. Please upload the manuscript or provide the PRIDE ID (PXD).');
         loadSessions();
     }
 
@@ -482,7 +742,7 @@
                 });
                 if (response.ok) {
                     clearMessages();
-                    addMessage('assistant', '👋 Hello! I\'m your SDRFscribe assistant. Please upload the manuscript or the PRIDE ID(PXD)');
+                    addMessage('assistant', '👋 Hello! I\'m your SDRFscribe assistant. Please upload the manuscript or provide the PRIDE ID (PXD).');
                 }
             } catch (error) {
                 console.error('Clear session failed:', error);
@@ -520,13 +780,20 @@
             const response = await fetch(`/sessions/${sessionId}/history`);
             const data = await response.json();
             if (data.history.length === 0) {
-                addMessage('assistant', "👋 Hello! I'm your SDRFscribe assistant. Please upload the manuscript or the PRIDE ID(PXD)");
+                addMessage('assistant', "👋 Hello! I'm your SDRFscribe assistant. Please upload the manuscript or provide the PRIDE ID (PXD).");
             } else {
                 data.history.forEach(msg => {
                     addMessage(msg.role, msg.content, false);
                 });
-                const messagesDiv = document.getElementById('messages');
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                // 对最后一条消息尝试渲染表单
+                setTimeout(() => {
+                    const messagesDiv = document.getElementById('messages');
+                    const lastMessage = messagesDiv.lastElementChild;
+                    if (lastMessage && lastMessage.classList.contains('assistant') && !lastMessage.hasAttribute('data-tool-message')) {
+                        tryRenderInteractiveForm(lastMessage);
+                    }
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                }, 100);
             }
         } catch (error) {
             console.error('Load history failed:', error);
@@ -590,10 +857,9 @@
         messageInput.value = '';
         messageInput.style.height = 'auto';
 
-        // ✅ 关键修复: 分别管理工具消息和AI文本消息
-        let toolMessageId = null;  // 工具消息的 ID
-        let aiTextAccumulated = '';  // AI 文本累积器
-        let hasToolCalls = false;  // 是否有工具调用
+        let toolMessageId = null;
+        let aiTextAccumulated = '';
+        let hasToolCalls = false;
 
         try {
             const response = await fetch('/chat/stream', {
@@ -621,17 +887,15 @@
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
                         const data = line.slice(6).trim();
-                        if (data === '[DONE]') continue;  // ✅ 使用 continue 而不是 break
+                        if (data === '[DONE]') continue;
 
                         try {
                             const parsed = JSON.parse(data);
 
-                            // ✅ 处理 AI 文本回复
                             if (parsed.type === 'text' && parsed.content) {
                                 aiTextAccumulated += parsed.content;
                                 updateOrCreateAIMessage(aiTextAccumulated);
                             }
-                            // ✅ 处理工具调用信息 (放在独立的工具消息框中)
                             else if (parsed.type === 'tool_call') {
                                 hasToolCalls = true;
                                 if (!toolMessageId) {
@@ -639,19 +903,16 @@
                                 }
                                 appendToToolMessage(toolMessageId, parsed.content + '\n\n');
                             }
-                            // ✅ 处理工具结果
                             else if (parsed.type === 'tool_result') {
                                 if (toolMessageId) {
                                     appendToToolMessage(toolMessageId, parsed.content + '\n\n');
                                 }
                             }
-                            // ✅ 处理 SDRF 生成结果
                             else if (parsed.type === 'sdrf_generated') {
                                 const sdrf_msg = `\n\n✅ SDRF file has been generated!\n📥 Download: ${parsed.filename}`;
                                 aiTextAccumulated += sdrf_msg;
                                 updateOrCreateAIMessage(aiTextAccumulated);
                             }
-                            // ✅ 处理错误
                             else if (parsed.type === 'error') {
                                 addMessage('assistant', `❌ Error: ${parsed.content}`);
                             }
@@ -661,46 +922,55 @@
                     }
                 }
             }
+
+            // ✅ 流式传输结束，检测并渲染交互式表单
+            setTimeout(() => {
+                const messagesDiv = document.getElementById('messages');
+                const lastMessage = messagesDiv.lastElementChild;
+                if (lastMessage && lastMessage.classList.contains('assistant') && !lastMessage.hasAttribute('data-tool-message')) {
+                    tryRenderInteractiveForm(lastMessage);
+                }
+            }, 100);
+
         } catch (error) {
             console.error('Send failed:', error);
             addMessage('assistant', '❌ Send failed, please retry');
         } finally {
             sendBtn.disabled = false;
-            sendBtn.textContent = '→';
+            sendBtn.textContent = '↑';
             loadSessions();
         }
     }
 
-    // ✅ 新增: 更新或创建 AI 消息
     function updateOrCreateAIMessage(content) {
         const messagesDiv = document.getElementById('messages');
         let lastMessage = messagesDiv.lastElementChild;
 
-        // 检查最后一条消息是否是 AI 文本消息 (不是工具消息)
         if (lastMessage &&
             lastMessage.classList.contains('assistant') &&
             !lastMessage.hasAttribute('data-tool-message')) {
-            // 更新现有消息
             const contentDiv = lastMessage.querySelector('.message-content');
-            contentDiv.textContent = content;
+
+            // 如果包含 json-form-container，说明已经渲染过了，不再更新纯文本
+            if (!contentDiv.querySelector('.json-form-container')) {
+                 contentDiv.textContent = content;
+            }
         } else {
-            // 创建新消息
             addMessage('assistant', content);
         }
 
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
-    // ✅ 新增: 创建工具消息框
     function addToolMessage(content) {
         const messagesDiv = document.getElementById('messages');
         const messageDiv = document.createElement('div');
         messageDiv.className = 'message assistant';
-        messageDiv.setAttribute('data-tool-message', 'true');  // 标记为工具消息
+        messageDiv.setAttribute('data-tool-message', 'true');
 
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
-        contentDiv.style.backgroundColor = '#fff3cd';  // 淡黄色背景
+        contentDiv.style.backgroundColor = '#fff3cd';
         contentDiv.style.borderLeft = '4px solid #ffc107';
         contentDiv.style.fontFamily = 'monospace';
         contentDiv.style.fontSize = '13px';
@@ -714,7 +984,6 @@
         return messageDiv.id = 'tool-msg-' + Date.now();
     }
 
-    // ✅ 新增: 追加内容到工具消息
     function appendToToolMessage(messageId, content) {
         const messageDiv = document.getElementById(messageId);
         if (messageDiv) {
@@ -739,16 +1008,442 @@
         }
     }
 
-    function updateLastMessage(content) {
-        const messagesDiv = document.getElementById('messages');
-        let lastMessage = messagesDiv.lastElementChild;
-        if (!lastMessage || !lastMessage.classList.contains('assistant')) {
-            addMessage('assistant', content);
-        } else {
-            const contentDiv = lastMessage.querySelector('.message-content');
-            contentDiv.textContent = content;
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    // ==========================================
+    // 交互式表单渲染引擎
+    // ==========================================
+
+    function tryRenderInteractiveForm(messageElement) {
+        const contentDiv = messageElement.querySelector('.message-content');
+        // 防止重复渲染
+        if (contentDiv.querySelector('.json-form-container')) return;
+
+        const rawText = contentDiv.innerText;
+
+        // 正则匹配 JSON 代码块
+        const jsonMatch = rawText.match(/```json\s*([\s\S]*?)\s*```/) || rawText.match(/(\{[\s\S]*"data_type"[\s\S]*\})/);
+
+        if (!jsonMatch) return;
+
+        try {
+            const jsonData = JSON.parse(jsonMatch[1]);
+            const dataType = jsonData.data_type;
+
+            // 仅处理特定的 data_type
+            if (['choice_template_json', 'core_correlation_json', 'complete_information_json'].includes(dataType)) {
+
+                // 🔥🔥🔥 新增代码：激活宽屏模式，使表单占用 80% 宽度 🔥🔥🔥
+                messageElement.classList.add('wide-mode');
+                // ------------------------------------
+
+                // 隐藏原始 JSON 文本块
+                contentDiv.innerHTML = rawText.replace(jsonMatch[0],
+                    `<div class="toggle-json-btn" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">Show/Hide Raw JSON</div><pre class="json-hidden" style="white-space: pre-wrap; font-size: 11px; color: #888; background: #f4f4f4; padding: 10px; border-radius: 4px; margin-top: 5px;">${jsonMatch[1]}</pre>`
+                );
+
+                // 创建表单容器
+                const formContainer = document.createElement('div');
+                formContainer.className = 'json-form-container';
+
+                // 根据类型渲染
+                if (dataType === 'choice_template_json') {
+                    renderChoiceTemplateForm(jsonData, formContainer);
+                } else if (dataType === 'core_correlation_json') {
+                    renderCoreCorrelationForm(jsonData, formContainer);
+                } else if (dataType === 'complete_information_json') {
+                    renderCompleteInfoForm(jsonData, formContainer);
+                }
+
+                contentDiv.appendChild(formContainer);
+
+                // ✨✨✨ 关键步骤：初始化自适应文本框高度 ✨✨✨
+                // 使用 setTimeout 确保 DOM 已经插入完毕
+                setTimeout(() => {
+                    initAutoResizeTextareas(formContainer);
+                }, 0);
+
+                // 滚动到底部
+                const messagesDiv = document.getElementById('messages');
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }
+        } catch (e) {
+            console.warn("JSON parse failed for interactive form", e);
         }
+    }
+
+    // ==========================================
+    // ✨ 辅助函数：生成 Description 和 Query 的文本域 (已改为自适应)
+    // ==========================================
+    function generateInfoFields(data) {
+        let html = '';
+
+        // Description 字段
+        if (data.description) {
+            html += `
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="color: #2c3e50; font-weight: bold;">📝 AI Description (Analysis)</label>
+                <textarea class="auto-expand-textarea" readonly rows="1"
+                    style="background: #f8f9fa; color: #555; border-left: 3px solid #667eea;">${data.description}</textarea>
+            </div>`;
+        }
+
+        // Query 字段
+        if (data.query) {
+            html += `
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="color: #d35400; font-weight: bold;">❓ AI Query (Please Confirm)</label>
+                <textarea class="auto-expand-textarea" readonly rows="1"
+                    style="background: #fff8e1; color: #8a6d3b; border-color: #faebcc; border-left: 3px solid #ffc107;">${data.query}</textarea>
+            </div>`;
+        }
+
+        return html;
+    }
+
+    // ------------------------------------------
+    // 1. 渲染 Choice Template Form
+    // ------------------------------------------
+    function renderChoiceTemplateForm(data, container) {
+        // 生成 Description 和 Query
+        const infoFields = generateInfoFields(data);
+
+        // 生成 Template 下拉菜单选项
+        const templateOptions = ["Human", "Cell lines", "Vertebrates", "Non-vertebrates", "Plants", "Default"];
+        const currentTemplate = (data.template_name || '').toLowerCase();
+
+        const optionsHtml = templateOptions.map(t => {
+            const isSelected = t.toLowerCase() === currentTemplate ? 'selected' : '';
+            return `<option value="${t}" ${isSelected}>${t}</option>`;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="form-header">
+                <h3>📑 Step 1: Template & Sample Info</h3>
+            </div>
+
+            <div class="form-section">
+                ${infoFields}
+            </div>
+
+            <div class="kv-grid form-section">
+                <div class="form-group">
+                    <label>Template Name</label>
+                    <select class="form-input" data-key="template_name" style="cursor: pointer;">
+                        ${optionsHtml}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Sample Number</label>
+                    <input type="number" class="form-input" data-key="sample_number" value="${data.sample_number || 0}">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <span class="form-section-title">Attributes (Edit values as comma-separated lists)</span>
+                <div class="kv-grid" id="attributes-grid">
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button class="btn-confirm" onclick="submitJsonForm(this, 'choice_template_json')">✅ Confirm & Continue</button>
+            </div>
+        `;
+
+        // 填充 Attributes - 使用自适应 Textarea
+        const grid = container.querySelector('#attributes-grid');
+        const attributes = data.attributes || {};
+
+        for (const [key, value] of Object.entries(attributes)) {
+            const valStr = Array.isArray(value) ? value.join(', ') : value;
+            const div = document.createElement('div');
+            div.className = 'form-group';
+            // ✨ 修改: Input -> Textarea with auto-expand-textarea
+            div.innerHTML = `
+                <label>${key}</label>
+                <textarea rows="1" class="auto-expand-textarea attribute-input" data-attr-key="${key}">${valStr}</textarea>
+            `;
+            grid.appendChild(div);
+        }
+
+        container.dataset.originalJson = JSON.stringify(data);
+    }
+
+    // ------------------------------------------
+    // 2. 渲染 Core Correlation Form (Table View)
+    // ------------------------------------------
+    function renderCoreCorrelationForm(data, container) {
+        const infoFields = generateInfoFields(data);
+
+        const isNoLink = !!data.no_link_attributes;
+        const attributes = isNoLink ? data.no_link_attributes : data.attributes;
+        const fileRows = data.file_rows === 'none' ? (attributes['source name']?.length || 0) : data.file_rows;
+
+        // 获取所有列名
+        const keys = Object.keys(attributes);
+        let rowCount = 0;
+        if (fileRows && fileRows !== 'none') {
+            rowCount = parseInt(fileRows);
+        } else {
+             // 尝试找到第一个是数组的属性来确定行数
+             for(let k of keys) {
+                 if(Array.isArray(attributes[k])) {
+                     rowCount = attributes[k].length;
+                     break;
+                 }
+             }
+        }
+
+        let tableHeader = keys.map(k => `<th>${k}</th>`).join('');
+        let tableBody = '';
+
+        for (let i = 0; i < rowCount; i++) {
+            let rowHtml = '<tr>';
+            keys.forEach(key => {
+                let val = '';
+                if (attributes[key]) {
+                    if (Array.isArray(attributes[key])) {
+                        val = attributes[key][i] !== undefined ? attributes[key][i] : '';
+                    } else if (i === 0) {
+                        val = attributes[key];
+                    } else {
+                        val = attributes[key];
+                    }
+                }
+                // ✨ 修改: td 中的 input 改为 textarea
+                rowHtml += `<td><textarea rows="1" class="auto-expand-textarea" data-col="${key}">${val}</textarea></td>`;
+            });
+            rowHtml += '</tr>';
+            tableBody += rowHtml;
+        }
+
+        container.innerHTML = `
+            <div class="form-header">
+                <h3>🔗 Step 2: Core Mapping</h3>
+            </div>
+
+            <div class="form-section">
+                ${infoFields}
+            </div>
+
+            <div class="form-section">
+                <div class="table-wrapper">
+                    <table class="styled-table" id="core-table">
+                        <thead><tr>${tableHeader}</tr></thead>
+                        <tbody>${tableBody}</tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button class="btn-confirm" onclick="submitJsonForm(this, 'core_correlation_json')">✅ Confirm Mapping</button>
+            </div>
+        `;
+
+        container.dataset.originalJson = JSON.stringify(data);
+    }
+
+    // ------------------------------------------
+    // 3. 渲染 Complete Information Form
+    // ------------------------------------------
+    function renderCompleteInfoForm(data, container) {
+        const infoFields = generateInfoFields(data);
+
+        // 1. Constant Attributes (Key-Value)
+        let constantHtml = '';
+        if (data.constant_attributes) {
+            for (const [key, val] of Object.entries(data.constant_attributes)) {
+                // ✨ 修改: Input -> Textarea
+                constantHtml += `
+                    <div class="form-group">
+                        <label>${key}</label>
+                        <textarea rows="1" class="auto-expand-textarea constant-input" data-key="${key}">${val}</textarea>
+                    </div>`;
+            }
+        }
+
+        // 2. Verity Attributes (Table)
+        let verityTableHtml = '';
+        let verityKeys = [];
+        if (data.verity_attributes) {
+            verityKeys = Object.keys(data.verity_attributes);
+            const rowCount = data.file_rows;
+
+            let thead = verityKeys.map(k => `<th>${k}</th>`).join('');
+            let tbody = '';
+
+            for (let i = 0; i < rowCount; i++) {
+                tbody += '<tr>';
+                verityKeys.forEach(key => {
+                    const val = data.verity_attributes[key][i] || '';
+                    // ✨ 修改: Input -> Textarea
+                    tbody += `<td><textarea rows="1" class="auto-expand-textarea" data-verity-col="${key}">${val}</textarea></td>`;
+                });
+                tbody += '</tr>';
+            }
+
+            verityTableHtml = `
+                <div class="table-wrapper">
+                    <table class="styled-table" id="verity-table">
+                        <thead><tr>${thead}</tr></thead>
+                        <tbody>${tbody}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // 3. No Value Attributes
+        let noValueHtml = '';
+        if (data.no_value_attributes && Object.keys(data.no_value_attributes).length > 0) {
+            let items = '';
+            for(const [key, val] of Object.entries(data.no_value_attributes)) {
+                // ✨ 修改: Input -> Textarea
+                items += `<div class="form-group"><label>${key}</label><textarea rows="1" class="auto-expand-textarea no-value-input" data-key="${key}">${val}</textarea></div>`;
+            }
+            noValueHtml = `
+                <div class="form-section">
+                    <span class="form-section-title" style="color:#d9534f">Missing Values (Please fill if known)</span>
+                    <div class="kv-grid">${items}</div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = `
+            <div class="form-header">
+                <h3>✨ Step 3: Complete Information</h3>
+            </div>
+
+            <div class="form-section">
+                ${infoFields}
+            </div>
+
+            <div class="form-section">
+                <span class="form-section-title">Constant Attributes (Same for all samples)</span>
+                <div class="kv-grid">
+                    ${constantHtml}
+                </div>
+            </div>
+
+            <div class="form-section">
+                <span class="form-section-title">Variable Attributes (Specific to each file/sample)</span>
+                ${verityTableHtml}
+            </div>
+
+            ${noValueHtml}
+
+            <div class="form-actions">
+                <button class="btn-confirm" onclick="submitJsonForm(this, 'complete_information_json')">🚀 Generate SDRF</button>
+            </div>
+        `;
+
+        container.dataset.originalJson = JSON.stringify(data);
+    }
+
+    // ==========================================
+    // 提交逻辑
+    // ==========================================
+
+    function submitJsonForm(btn, type) {
+        const container = btn.closest('.json-form-container');
+        const originalData = JSON.parse(container.dataset.originalJson);
+        let newData = JSON.parse(JSON.stringify(originalData)); // Deep copy
+
+        // 修改状态为 revised
+        newData.status = "revised";
+
+        // ✨ 修改选择器：兼容获取 textarea 的值
+
+        if (type === 'choice_template_json') {
+            // 收集顶层字段
+            const tName = container.querySelector('[data-key="template_name"]').value;
+            const sNum = parseInt(container.querySelector('[data-key="sample_number"]').value);
+
+            if (tName !== newData.template_name) newData.template_name = tName;
+            if (sNum !== newData.sample_number) newData.sample_number = sNum;
+
+            // 收集 Attributes (转回数组) - 使用新的 class 选择器，无需改动 (Attribute使用 .attribute-input)
+            const attrInputs = container.querySelectorAll('.attribute-input');
+            attrInputs.forEach(input => {
+                const key = input.dataset.attrKey;
+                const valArr = input.value.split(',').map(s => s.trim()).filter(s => s !== '');
+                newData.attributes[key] = valArr;
+            });
+        }
+        else if (type === 'core_correlation_json') {
+            const table = container.querySelector('#core-table');
+            const rows = table.querySelectorAll('tbody tr');
+
+            // 确定目标对象
+            const isNoLink = !!newData.no_link_attributes;
+            const targetObj = isNoLink ? newData.no_link_attributes : newData.attributes;
+            const keys = Object.keys(targetObj);
+
+            // 初始化空数组
+            keys.forEach(k => targetObj[k] = []);
+
+            rows.forEach(row => {
+                // ✨ 修改: 查找 textarea 或 input
+                const inputs = row.querySelectorAll('input, textarea');
+                inputs.forEach(input => {
+                    const col = input.dataset.col;
+                    if(targetObj[col]) {
+                         targetObj[col].push(input.value);
+                    }
+                });
+            });
+
+            // 如果原来的 file_rows 是 'none' 但现在用户确认了关系，可以更新它
+            if (newData.file_rows === 'none') {
+                 newData.file_rows = rows.length;
+            }
+        }
+        else if (type === 'complete_information_json') {
+            // 1. Constants
+            const constInputs = container.querySelectorAll('.constant-input');
+            constInputs.forEach(input => {
+                newData.constant_attributes[input.dataset.key] = input.value;
+            });
+
+            // 2. Verity Table
+            const table = container.querySelector('#verity-table');
+            if (table) {
+                const rows = table.querySelectorAll('tbody tr');
+                const keys = Object.keys(newData.verity_attributes);
+
+                // 清空旧数据
+                keys.forEach(k => newData.verity_attributes[k] = []);
+
+                rows.forEach(row => {
+                    // ✨ 修改: 查找 textarea 或 input
+                    const inputs = row.querySelectorAll('input, textarea');
+                    inputs.forEach(input => {
+                        const col = input.dataset.verityCol;
+                        if(newData.verity_attributes[col]) {
+                            newData.verity_attributes[col].push(input.value);
+                        }
+                    });
+                });
+            }
+
+            // 3. No Value
+            const noValInputs = container.querySelectorAll('.no-value-input');
+            if(noValInputs.length > 0) {
+                 noValInputs.forEach(input => {
+                     newData.no_value_attributes[input.dataset.key] = input.value;
+                 });
+            }
+        }
+
+        // 禁用按钮防止重复提交
+        btn.disabled = true;
+        btn.textContent = "Submitting...";
+
+        // 将修改后的 JSON 作为用户消息发送
+        const messageInput = document.getElementById('messageInput');
+
+        // 构造发送给 LLM 的 prompt
+        const prompt = `Here is the confirmed/revised information:\n\`\`\`json\n${JSON.stringify(newData, null, 2)}\n\`\`\``;
+
+        messageInput.value = prompt;
+        sendMessage();
     }
 
     window.onload = init;

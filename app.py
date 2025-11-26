@@ -20,12 +20,12 @@ import re, os
 import asyncio
 from typing import List, Dict, Any, Optional
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
-# CHANGE 1: 导入 OpenAI 客户端
+# CHANGE 1: Import OpenAI client
 from langchain_openai import ChatOpenAI
 
 import uuid
 from pathlib import Path
-# 导入 PRIDE 工具
+# Import PRIDE tools
 from pride_tools import PRIDE_TOOLS, get_all_pride_data
 from dotenv import load_dotenv, find_dotenv
 
@@ -33,7 +33,7 @@ from dotenv import load_dotenv, find_dotenv
 env_path = find_dotenv()
 load_dotenv(dotenv_path=env_path, override=True, verbose=True)
 
-# 打印 key 用于调试（生产环境请注意安全）
+# Print key for debugging (ensure security in production environment)
 print(f"API Base: http://127.0.0.1:9000/v1")
 print(f"API Key present: {bool(os.getenv('OPENAI_API_KEY'))}")
 
@@ -52,22 +52,22 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-# 模板文件映射
+# Template file mapping
 TEMPLATE_FILES = {
     "human": "sdrf-human.sdrf.tsv",
     "cell lines": "sdrf-cell-line.sdrf.tsv",
     "vertebrates": "sdrf-vertebrates.sdrf.tsv",
-    "invertebrates": "sdrf-invertebrates.sdrf.tsv",
+    "non-vertebrates": "sdrf-invertebrates.sdrf.tsv",
     "plants": "sdrf-plants.sdrf.tsv",
     "default": "sdrf-default.sdrf.tsv"
 }
 
-# 模板文件目录路径
+# Template file directory path
 TEMPLATE_DIR = Path("templates")
 
 
 def load_template_columns(template_name: str) -> List[str]:
-    """根据模板名称加载模板文件的列顺序"""
+    """Loads the column order of the template file based on the template name"""
     template_name = template_name.strip().lower()
     template_file = TEMPLATE_FILES.get(template_name)
     if not template_file:
@@ -82,7 +82,7 @@ def load_template_columns(template_name: str) -> List[str]:
 
 
 def reorder_dataframe_columns(df: pd.DataFrame, template_columns: List[str]) -> pd.DataFrame:
-    """根据模板列顺序重新排列DataFrame的列"""
+    """Reorders the columns of the DataFrame according to the template column order"""
     df_columns = df.columns.tolist()
     ordered_columns = []
     for col in template_columns:
@@ -94,9 +94,9 @@ def reorder_dataframe_columns(df: pd.DataFrame, template_columns: List[str]) -> 
     return df[ordered_columns]
 
 
-# SDRF 文件生成相关函数
+# SDRF file generation related functions
 def detect_complete_information_json(text: str) -> Dict[str, Any]:
-    """检测文本中是否包含complete_information_json数据"""
+    """Detects if the text contains complete_information_json data"""
     try:
         json_pattern = r'\{.*?"data_type"\s*:\s*"complete_information_json".*?\}'
         matches = re.findall(json_pattern, text, re.DOTALL)
@@ -128,7 +128,7 @@ def detect_complete_information_json(text: str) -> Dict[str, Any]:
 
 
 def generate_sdrf_csv(json_data: Dict[str, Any]) -> str:
-    """从complete_information_json生成SDRF CSV文件"""
+    """Generates the SDRF CSV file from complete_information_json (Fixed version)"""
     try:
         template_name = json_data.get("template_name")
         if not template_name:
@@ -142,38 +142,70 @@ def generate_sdrf_csv(json_data: Dict[str, Any]) -> str:
             raise ValueError("Invalid file_rows value")
 
         rows = []
+        # Get PXD ID, handling list or single value case
+        pxd_id_raw = json_data.get("PXD_ID", [])
+        PXD_ID = pxd_id_raw[0] if isinstance(pxd_id_raw, list) and pxd_id_raw else (
+            pxd_id_raw if pxd_id_raw else "Unknown")
+
         for i in range(file_rows):
             row = {}
-            PXD_ID = json_data.get("PXD_ID", [])
 
-            constant_attrs = json_data.get("constant_attributes", [])
-            for attr_dict in constant_attrs:
-                for key, value in attr_dict.items():
+            # 1. Process Constant Attributes (dictionary format)
+            constant_attrs = json_data.get("constant_attributes", {})
+            if isinstance(constant_attrs, dict):
+                for key, value in constant_attrs.items():
                     row[key] = value
+            elif isinstance(constant_attrs, list):  # Backward compatibility
+                for attr_dict in constant_attrs:
+                    for key, value in attr_dict.items():
+                        row[key] = value
 
-            verity_attrs = json_data.get("verity_attributes", [])
-            for attr_dict in verity_attrs:
-                for key, value_list in attr_dict.items():
+            # 2. Process Verity Attributes (dictionary format: key -> list)
+            verity_attrs = json_data.get("verity_attributes", {})
+            if isinstance(verity_attrs, dict):
+                for key, value_list in verity_attrs.items():
                     if isinstance(value_list, list) and len(value_list) > i:
                         row[key] = value_list[i]
                     elif isinstance(value_list, list) and len(value_list) > 0:
                         row[key] = value_list[-1]
                     else:
                         row[key] = ""
+            elif isinstance(verity_attrs, list):  # Backward compatibility
+                for attr_dict in verity_attrs:
+                    for key, value_list in attr_dict.items():
+                        if isinstance(value_list, list) and len(value_list) > i:
+                            row[key] = value_list[i]
+                        else:
+                            row[key] = ""
 
-            factor_values = json_data.get("factor value", [])
-            for factor_dict in factor_values:
-                for factor_name, factor_value_list in factor_dict.items():
+            # 3. Process Factor Values (dictionary format)
+            factor_values = json_data.get("factor value",
+                                          {})  # Note: Prompt sometimes uses "factor value", sometimes "factor_value". Add tolerance here or adhere to Prompt.
+            if not factor_values:
+                factor_values = json_data.get("factor_value", {})
+
+            if isinstance(factor_values, dict):
+                for factor_name, factor_value_list in factor_values.items():
+                    col_name = f"factor value[{factor_name}]"
                     if isinstance(factor_value_list, list) and len(factor_value_list) > i:
-                        row[f"factor value[{factor_name}]"] = factor_value_list[i]
+                        row[col_name] = factor_value_list[i]
                     elif isinstance(factor_value_list, list) and len(factor_value_list) > 0:
-                        row[f"factor value[{factor_name}]"] = factor_value_list[-1]
+                        row[col_name] = factor_value_list[-1]
                     else:
-                        row[f"factor value[{factor_name}]"] = ""
+                        row[col_name] = ""
+            elif isinstance(factor_values, list):  # Backward compatibility
+                for factor_dict in factor_values:
+                    for factor_name, factor_value_list in factor_dict.items():
+                        # ... (Same logic as above)
+                        if isinstance(factor_value_list, list) and len(factor_value_list) > i:
+                            row[f"factor value[{factor_name}]"] = factor_value_list[i]
+                        else:
+                            row[f"factor value[{factor_name}]"] = ""
 
-            no_link_attrs = json_data.get("no_link_attributes", [])
-            for attr_dict in no_link_attrs:
-                for key, value_list in attr_dict.items():
+            # 4. Process No Link Attributes (dictionary format)
+            no_link_attrs = json_data.get("no_link_attributes", {})
+            if isinstance(no_link_attrs, dict):
+                for key, value_list in no_link_attrs.items():
                     if isinstance(value_list, list) and len(value_list) > i:
                         row[key] = value_list[i]
                     elif isinstance(value_list, list) and len(value_list) > 0:
@@ -181,13 +213,11 @@ def generate_sdrf_csv(json_data: Dict[str, Any]) -> str:
                     else:
                         row[key] = ""
 
-            no_value_attrs = json_data.get("no_value_attributes", [])
-            for attr_dict in no_value_attrs:
-                for key, value_list in attr_dict.items():
-                    if isinstance(value_list, list) and len(value_list) > 0:
-                        row[key] = value_list[0] if len(value_list) == 1 else value_list
-                    else:
-                        row[key] = ""
+            # 5. Process No Value Attributes (dictionary format)
+            no_value_attrs = json_data.get("no_value_attributes", {})
+            if isinstance(no_value_attrs, dict):
+                for key, value in no_value_attrs.items():
+                    row[key] = ""  # Or fill with value (e.g., "not available")
 
             rows.append(row)
 
@@ -195,10 +225,10 @@ def generate_sdrf_csv(json_data: Dict[str, Any]) -> str:
         df = reorder_dataframe_columns(df, template_columns)
 
         filename = f"sdrf_{template_name.replace(' ', '_')}_{PXD_ID}.tsv"
-        # ⚠️ 请确保此路径存在
+        # ⚠️ Please ensure this path exists (according to the path in your provided code)
         filepath = f"E:/langchain_book/pythonProject/SDRFscribe/SDRFfiles/{filename}"
 
-        # 确保目录存在
+        # Ensure directory exists
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
         df.to_csv(filepath, index=False, sep='\t')
@@ -216,7 +246,7 @@ def generate_sdrf_csv(json_data: Dict[str, Any]) -> str:
 class Chatbot:
     def __init__(self):
         # Load system prompt
-        with open('E:/langchain_book/pythonProject/system_prompt_vesion0.2.txt', 'r', encoding='utf-8') as f:
+        with open('system_prompt.txt', 'r', encoding='utf-8') as f:
             self.system_prompt = f.read().strip()
 
         # Load additional context if available
@@ -227,7 +257,7 @@ class Chatbot:
         except FileNotFoundError:
             self.sdrf_proteomic = ""
 
-        # 注意：我们在 stream_chat 中手动构建消息列表，不再强依赖这个模板
+        # Note: We manually construct the message list in stream_chat, no longer strongly relying on this template
         self.prompt_template = ChatPromptTemplate.from_messages([
             ('system', '{system_prompt}'),
             MessagesPlaceholder(variable_name='history'),
@@ -238,7 +268,7 @@ class Chatbot:
         self.session_names = {}
 
     def _get_model(self, model_name: str = "gemini-2.5-flash"):
-        """动态创建模型实例并绑定工具"""
+        """Dynamically create model instance and bind tools"""
         api_key = os.getenv("OPENAI_API_KEY") or "sk-dummy-key"
         base_url = "http://127.0.0.1:9000/v1"
 
@@ -249,7 +279,7 @@ class Chatbot:
             openai_api_key=api_key,
             openai_api_base=base_url,
             temperature=0,
-            request_timeout=240,
+            request_timeout=500,
         )
 
         model_with_tools = model.bind_tools(PRIDE_TOOLS)
@@ -262,79 +292,79 @@ class Chatbot:
 
     async def stream_chat(self, message: str, session_id: str = "default", model_name: str = "gemini-2.5-flash"):
         """
-        修复版本: 模仿 CherryStudio 的实现逻辑
-        关键改进:
-        1. 分离流式输出和工具执行
-        2. 工具执行后自动触发第二次模型调用
-        3. 只在最终回复时才流式返回
+        Fixed version: Imitates the implementation logic of CherryStudio
+        Key improvements:
+        1. Separate streaming output and tool execution
+        2. Automatically trigger a second model call after tool execution
+        3. Only stream the final response
         """
         model = self._get_model(model_name)
         history_obj = self._get_message_history(session_id)
 
-        # 添加用户消息
+        # Add user message
         history_obj.add_message(HumanMessage(content=message))
 
-        MAX_ITERATIONS = 10  # 最大迭代次数
+        MAX_ITERATIONS = 10  # Maximum number of iterations
         iteration = 0
 
         try:
             while iteration < MAX_ITERATIONS:
                 iteration += 1
 
-                # 构建完整消息列表
+                # Construct full message list
                 messages = [SystemMessage(content=self.system_prompt)] + history_obj.messages
 
                 # ========================================
-                # 第一步: 获取模型的完整响应 (非流式)
+                # Step 1: Get the complete model response (non-streaming)
                 # ========================================
                 response = await model.ainvoke(messages)
 
                 # ========================================
-                # 第二步: 检查是否有工具调用
+                # Step 2: Check for tool calls
                 # ========================================
                 if response.tool_calls:
-                    # 保存 AI 的工具调用消息
+                    # Save AI's tool call message
                     history_obj.add_message(response)
 
-                    # 通知前端正在执行工具
-                    tool_info = f"🔧 检测到 {len(response.tool_calls)} 个工具调用"
+                    # Notify frontend that tools are being executed
+                    tool_info = f"🔧 Detected {len(response.tool_calls)} tool calls"
                     yield f"data: {json.dumps({'content': tool_info, 'type': 'tool_call'})}\n\n"
 
-                    # 执行所有工具
+                    # Execute all tools
                     for tool_call in response.tool_calls:
                         tool_name = tool_call.get('name', 'unknown')
                         tool_args = tool_call.get('args', {})
                         tool_call_id = tool_call.get('id', str(uuid.uuid4()))
 
-                        # 显示工具信息
-                        tool_detail = f"\n📋 工具: {tool_name}\n💬 参数: {json.dumps(tool_args, ensure_ascii=False)}"
+                        # Display tool information
+                        tool_detail = f"\n📋 Tool: {tool_name}\n💬 Arguments: {json.dumps(tool_args, ensure_ascii=False)}"
                         yield f"data: {json.dumps({'content': tool_detail, 'type': 'tool_call'})}\n\n"
 
                         try:
-                            # 执行工具
+                            # Execute tool
                             result = await self._execute_tool(tool_call)
 
                             if result.get('status') == 'success':
                                 result_data = result.get('data')
 
-                                # 显示结果摘要
-                                result_summary = f"✅ 执行成功"
+                                # Display result summary
+                                result_summary = f"✅ Execution successful"
                                 if isinstance(result_data, dict):
                                     if 'project_id' in result_data:
-                                        result_summary += f" - 项目: {result_data['project_id']}"
+                                        result_summary += f" - Project: {result_data['project_id']}"
                                     if 'file_count' in result_data:
-                                        result_summary += f" - 文件数: {result_data['file_count']}"
+                                        result_summary += f" - File count: {result_data['file_count']}"
 
                                 yield f"data: {json.dumps({'content': result_summary, 'type': 'tool_result'})}\n\n"
 
-                                # 序列化结果
+                                # Serialize result
                                 tool_output = json.dumps(result_data, ensure_ascii=False)
                             else:
-                                error_msg = f"❌ 工具执行失败: {result.get('error')}"
+                                error_msg = f"❌ Tool execution failed: {result.get('error')}"
                                 yield f"data: {json.dumps({'content': error_msg, 'type': 'tool_result'})}\n\n"
                                 tool_output = f"Error: {result.get('error')}"
 
-                            # 保存工具结果到历史
+                            # Save tool result to history
                             tool_message = ToolMessage(
                                 content=tool_output,
                                 tool_call_id=tool_call_id
@@ -342,10 +372,10 @@ class Chatbot:
                             history_obj.add_message(tool_message)
 
                         except Exception as e:
-                            error_msg = f"❌ 工具异常: {str(e)}"
+                            error_msg = f"❌ Tool exception: {str(e)}"
                             yield f"data: {json.dumps({'content': error_msg, 'type': 'error'})}\n\n"
 
-                            # 即使出错也要添加 ToolMessage
+                            # Add ToolMessage even if an error occurred
                             tool_message = ToolMessage(
                                 content=f"Error: {str(e)}",
                                 tool_call_id=tool_call_id
@@ -353,52 +383,52 @@ class Chatbot:
                             history_obj.add_message(tool_message)
 
                     # ========================================
-                    # 第三步: 工具执行完毕,继续循环
-                    # 下一轮迭代会带着工具结果再次调用模型
+                    # Step 3: Tool execution finished, continue loop
+                    # Next iteration will call the model again with tool results
                     # ========================================
-                    yield f"data: {json.dumps({'content': '\n🤔 正在分析工具结果...', 'type': 'tool_call'})}\n\n"
-                    continue  # 关键: 继续循环,让模型看到工具结果
+                    yield f"data: {json.dumps({'content': '\n🤔 Analyzing tool results...', 'type': 'tool_call'})}\n\n"
+                    continue  # Key: Continue loop, so the model sees the tool results
 
                 # ========================================
-                # 第四步: 没有工具调用,说明是最终回复
-                # 此时才进行流式输出
+                # Step 4: No tool calls, indicating the final response
+                # Only now perform streaming output
                 # ========================================
                 else:
-                    # 保存 AI 消息
+                    # Save AI message
                     history_obj.add_message(response)
 
-                    # 流式输出最终回复
+                    # Stream the final response
                     final_content = response.content
 
-                    # 模拟流式效果 (因为 ainvoke 已经获取了完整内容)
-                    # 如果需要真正的流式,这里应该再次调用 astream
+                    # Simulate streaming effect (since ainvoke already got the full content)
+                    # If true streaming is needed, call astream here instead
                     if final_content:
-                        # 分块发送以模拟流式效果
-                        chunk_size = 5  # 每次发送5个字符
+                        # Send in chunks to simulate streaming effect
+                        chunk_size = 5  # Send 5 characters per chunk
                         for i in range(0, len(final_content), chunk_size):
                             chunk = final_content[i:i + chunk_size]
                             yield f"data: {json.dumps({'content': chunk, 'type': 'text'})}\n\n"
-                            await asyncio.sleep(0.01)  # 小延迟,模拟打字效果
+                            await asyncio.sleep(0.01)  # Small delay to simulate typing
 
-                    # 检测并生成 SDRF
+                    # Detect and generate SDRF
                     json_data = detect_complete_information_json(final_content)
                     if json_data:
                         try:
                             filename = generate_sdrf_csv(json_data)
                             download_link = f"/download/sdrf/{filename}"
                             yield f"data: {json.dumps({'type': 'sdrf_generated', 'filename': filename, 'download_link': download_link})}\n\n"
-                            yield f"data: {json.dumps({'content': f'\\n\\n✅ SDRF 文件已生成!\\n📥 下载: [{filename}]({download_link})', 'type': 'text'})}\n\n"
+                            yield f"data: {json.dumps({'content': f'\\n\\n✅ SDRF file generated!\\n📥 Download: [{filename}]({download_link})', 'type': 'text'})}\n\n"
                         except Exception as e:
-                            yield f"data: {json.dumps({'content': f'SDRF 生成错误: {str(e)}', 'type': 'error'})}\n\n"
+                            yield f"data: {json.dumps({'content': f'SDRF Generation Error: {str(e)}', 'type': 'error'})}\n\n"
 
-                    # 任务完成,退出循环
+                    # Task complete, exit loop
                     break
 
-            # 发送结束信号
+            # Send end signal
             yield "data: [DONE]\n\n"
 
         except Exception as e:
-            error_msg = f"❌ 对话错误: {str(e)}"
+            error_msg = f"❌ Chat error: {str(e)}"
             print(error_msg)
             import traceback
             traceback.print_exc()
@@ -446,7 +476,7 @@ class Chatbot:
             if isinstance(msg, HumanMessage):
                 history.append({"role": "user", "content": msg.content})
             elif isinstance(msg, AIMessage):
-                # 过滤掉纯工具调用的中间消息，只显示有内容的回复
+                # Filter out intermediate tool call messages, only display replies with content
                 if msg.content:
                     history.append({"role": "assistant", "content": msg.content})
 
@@ -465,9 +495,9 @@ bot = Chatbot()
 class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
-    # CHANGE 5: 默认模型建议改为您的代理池支持的模型名称
-    # 既然您用的是 Gemini Key 池，可能还是习惯叫 "gemini-1.5-pro" 或 "gemini-1.5-flash"
-    # 您的代理应该能把这个名字映射到对应的 API Key
+    # CHANGE 5: Default model is suggested to be changed to the model name supported by your proxy pool
+    # Since you are using a Gemini Key pool, you might be accustomed to calling it "gemini-1.5-pro" or "gemini-1.5-flash"
+    # Your proxy should be able to map this name to the corresponding API Key
     model: str = "gemini-2.5-flash"
 
 
@@ -486,7 +516,7 @@ class PrideRequest(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"message": "PRIDE Chat API with Tools (OpenAI Interface)", "version": "5.1.0"}
+    return FileResponse("static/home.html")
 
 
 @app.get("/home")
@@ -499,7 +529,7 @@ async def chat():
     return FileResponse("static/chat.html")
 
 
-# File processing (保持不变)
+# File processing (Remains unchanged)
 def process_file(file_content: bytes, filename: str) -> str:
     file_ext = filename.lower().split('.')[-1]
 
@@ -620,7 +650,7 @@ async def get_all_pride_data_api(request: PrideRequest):
 async def download_sdrf_file(filename: str):
     """Download generated SDRF CSV file"""
     try:
-        # ⚠️ 请确保此路径与 generate_sdrf_csv 中的路径一致
+        # ⚠️ Please ensure this path is consistent with the path in generate_sdrf_csv
         base_dir = "E:/langchain_book/pythonProject/SDRFscribe/SDRFfiles/"
         file_path = os.path.join(base_dir, filename)
 
@@ -634,7 +664,6 @@ async def download_sdrf_file(filename: str):
         )
     except Exception as e:
         raise HTTPException(500, f"Failed to download file: {str(e)}")
-
 
 # Existing endpoints
 @app.get("/sessions")
